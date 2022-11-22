@@ -1,9 +1,17 @@
-# cachefinance
+# About
 
-    * A custom function and trigger to supplement GOOGLEFINANCE.
+<table>
+<tr>
+<td>
+
+    * CACHEFINANCE is a custom function and trigger to supplement GOOGLEFINANCE.
     * Valid **STOCK** data is always available even when GOOGLEFINANCE refuses to work.
     * GOOGLEFINANCE does not support all stock symbols.  Unsupported stocks can get price/name/yield data.  
     * As you can guess from the name, data is cached so when '#N/A' appears it does not mess up your asset history logging/graphing.
+    
+</td>
+</tr>
+</table>
 
 # Installing
 
