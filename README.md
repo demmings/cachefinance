@@ -1,3 +1,7 @@
+![Your Repository’s Stats](https://github-readme-stats.vercel.app/api?username=demmings&show_icons=true)
+
+---
+
 # About
 
 <table>
@@ -51,7 +55,7 @@
     * **CAVEAT EMPTOR**.  Custom functions are also far from perfect.  If Google Sheets decides to throw up the dreaded 'Loading' error, you are almost back to where we started with an unreliable GOOGLEFINANCE() function.
       * However, in my testing it seems to happen more often when you are doing a large number of finance lookups. 
     * **SYNTAX**.
-      *  CACHEFINANCE(symbol, attribute, defaultValue)
+      *  ```CACHEFINANCE(symbol, attribute, defaultValue)```
       *  symbol - stock symbol using regular GOOGLEFINANCE conventions.
       *  attribute - three supporte attributes for now "price", "yieldpct", "name".
       *  defaultValue - Use GOOGLEFINANCE() to supply this value either directly or using a CELL that contains the GOOGLEFINANCE value.
