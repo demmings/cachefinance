@@ -1,5 +1,13 @@
 ![Your Repository’s Stats](https://github-readme-stats.vercel.app/api?username=demmings&show_icons=true)
 
+[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=demmings_cachefinance&metric=code_smells)](https://sonarcloud.io/summary/new_code?id=demmings_cachefinance)
+[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=demmings_cachefinance&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=demmings_cachefinance)
+[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=demmings_cachefinance&metric=bugs)](https://sonarcloud.io/summary/new_code?id=demmings_cachefinance)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=demmings_cachefinance&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=demmings_cachefinance)
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=demmings_cachefinance&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=demmings_cachefinance)
+[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=demmings_cachefinance&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=demmings_cachefinance)
+
+
 ---
 
 # About
