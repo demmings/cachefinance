@@ -66,7 +66,7 @@
 
 ## Using through a trigger.
 * The custom function **=CACHEFINANCE()** works well enough, but it is still not 100% (the dreaded `Loading` error)
-* Using a trigger ensure that you will **NEVER** have invalid data in your output columns.
+* Using a trigger will ensure that you will **NEVER** have invalid data in your output columns.
   * However, if you provide a stock symbol not recognized by Google AND by any financial website we query - you just won't have any data in that case.
 * To use a trigger, you need to create a named range called **CACHEFINANCE**.
   * Go to 'Data' ==> 'Named Ranges' and select job records as the range.  That would be the light green section in the picture below.
@@ -89,12 +89,12 @@
     * ***NOTE**.  Google will interpret 9-17 as a date, so you will need to 'Format' ==> 'Number' ==> 'Plain Text'.
   * **Days of Week**.  Days of the week when the job can run.
     * Valid input is 0,1,2,3,4,5,6  and SUN, MON, TUE, WED, THU, FRI, SAT.
-    * Days can be selected using comma separator.  e.g.  ```0-1``` (for Sunday and Monday)
-    * A day range can be entered using the dask.  e.g.  ```MON-FRI```.
-  * **Trigger ID***.  Just leave BLANK.  This is used by the trigger that starts so it will know which job to take.
+    * Days can be selected using comma separator.  e.g.  ```0,1``` (for Sunday and Monday)
+    * A day range can be entered using the dash.  e.g.  ```MON-FRI```.
+  * **Trigger ID**.  Just leave BLANK.  This is used by the trigger that starts so it will know which job to take.
   * **NOTE** - Google caps the number of trigger minutes per day, so don't run more often than needed.  For example, how often to Stock Names change?  
 
-* The **Trigger Exists** in the picture above is actually a custom function:  **=CacheFinanceBoot()**
+* The **Trigger Exists** displayed in the picture above, is actually a custom function:  **=CacheFinanceBoot()**
   * This check to make sure that at least one instance of **CacheFinanceTrigger** is set up in the Triggers.
   * If none are found, it will create one (assuming you have the rights - you may need to manually **Run** first).
 
