@@ -104,7 +104,7 @@ class CacheJobSettings {
 
         if (missingTrigger) {
             Logger.log("Creating BOOTSTRAP Trigger for CacheFinanceTrigger function.")
-            let newTriggerID = ScriptApp
+            ScriptApp
                 .newTrigger('CacheFinanceTrigger')
                 .timeBased()
                 .after(15000)
@@ -281,6 +281,8 @@ class CacheJob {
      * @param {any[]} jobParmameters 
      */
     constructor(jobParmameters) {
+        this.DAYNAMES = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
+
         const CACHE_SETTINGS_SYMBOL = 0;
         const CACHE_SETTINGS_ATTRIBUTE = 1;
         const CACHE_SETTINGS_OUTPUT = 2;
@@ -338,7 +340,6 @@ class CacheJob {
     }
 
     extractRunDaysOfWeek() {
-        const dayNames = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN'];
         this.dayNumbers = [];
 
         if (this.days === '') {
@@ -349,63 +350,18 @@ class CacheJob {
             this.dayNumbers[i] = false;
 
         if (this.days === '*') {
-            this.days = dayNames.join(",");
+            this.days = this.DAYNAMES.join(",");
         }
 
-        if (this.days.indexOf(",") !== -1) {
-            let listValues = this.days.split(",");
-            listValues = listValues.map(p => p.trim());
-
-            for (let day of listValues) {
-                let dayNameIndex = dayNames.indexOf(day);
-                if (dayNameIndex == -1) {
-                    dayNameIndex = parseInt(day);
-                    if (isNaN(dayNameIndex))
-                        dayNameIndex = -1;
-
-                    if (dayNameIndex < 0 || dayNameIndex > 6)
-                        dayNameIndex = -1;
-                }
-
-                if (dayNameIndex !== -1) {
-                    this.dayNumbers[dayNameIndex] = true;
-                }
-            }
-
+        if (this.extractListDaysOfWeek()) {
             return;
         }
 
-        if (this.days.indexOf("-") !== -1) {
-            let rangeValues = this.days.split("-");
-            rangeValues = rangeValues.map(p => p.trim());
-
-            let startDayNameIndex = dayNames.indexOf(rangeValues[0]);
-            let endDayNameIndex = dayNames.indexOf(rangeValues[1]);
-            if (startDayNameIndex == -1 || endDayNameIndex == -1) {
-                startDayNameIndex = parseInt(rangeValues[0]);
-                endDayNameIndex = parseInt(rangeValues[1]);
-
-                if (isNaN(startDayNameIndex) || isNaN(endDayNameIndex)) {
-                    return;
-                }
-            }
-
-            let count = 0;
-            for (let i = startDayNameIndex; count < 7; count++) {
-                this.dayNumbers[i] = true;
-
-                if (i == endDayNameIndex)
-                    break;
-
-                i++;
-                if (i > 6)
-                    i = 0;
-            }
-
+        if (this.extractRangeDaysOfWeek()) {
             return;
         }
 
-        let dayNameIndex = dayNames.indexOf(this.days);
+        let dayNameIndex = this.DAYNAMES.indexOf(this.days);
         if (dayNameIndex !== -1) {
             this.dayNumbers[dayNameIndex] = true;
             return;
@@ -418,6 +374,67 @@ class CacheJob {
         }
 
         Logger.log("Job does not contain any days of the week to run. " + this.days);
+    }
+
+    extractListDaysOfWeek() {
+        if (this.days.indexOf(",") === -1) {
+            return false;
+        }
+
+        let listValues = this.days.split(",");
+        listValues = listValues.map(p => p.trim());
+
+        for (let day of listValues) {
+            let dayNameIndex = this.DAYNAMES.indexOf(day);
+            if (dayNameIndex == -1) {
+                dayNameIndex = parseInt(day);
+                if (isNaN(dayNameIndex))
+                    dayNameIndex = -1;
+
+                if (dayNameIndex < 0 || dayNameIndex > 6)
+                    dayNameIndex = -1;
+            }
+
+            if (dayNameIndex !== -1) {
+                this.dayNumbers[dayNameIndex] = true;
+            }
+        }
+
+        return true;
+    }
+
+    extractRangeDaysOfWeek() {
+        if (this.days.indexOf("-") === -1) {
+            return false;
+        }
+
+        let rangeValues = this.days.split("-");
+        rangeValues = rangeValues.map(p => p.trim());
+
+        let startDayNameIndex = this.DAYNAMES.indexOf(rangeValues[0]);
+        let endDayNameIndex = this.DAYNAMES.indexOf(rangeValues[1]);
+        if (startDayNameIndex == -1 || endDayNameIndex == -1) {
+            startDayNameIndex = parseInt(rangeValues[0]);
+            endDayNameIndex = parseInt(rangeValues[1]);
+
+            if (isNaN(startDayNameIndex) || isNaN(endDayNameIndex)) {
+                return;
+            }
+        }
+
+        let count = 0;
+        for (let i = startDayNameIndex; count < 7; count++) {
+            this.dayNumbers[i] = true;
+
+            if (i == endDayNameIndex)
+                break;
+
+            i++;
+            if (i > 6)
+                i = 0;
+        }
+
+        return true;
     }
 
     extractHoursOfDay() {
@@ -433,57 +450,12 @@ class CacheJob {
         if (this.hours === '*')
             return;
 
-        if (this.hours.indexOf(",") !== -1) {
-            let listValues = this.hours.split(",");
-            listValues = listValues.map(p => p.trim());
-
-            for (let hr of listValues) {
-                let hourIndex = parseInt(hr);
-                if (isNaN(hourIndex))
-                    hourIndex = -1;
-
-                if (hourIndex < 0 || hourIndex > 23)
-                    hourIndex = -1;
-
-
-                if (hourIndex !== -1) {
-                    this.hourNumbers[hourIndex] = true;
-                }
-            }
-
+        if (this.extractListHoursOfDay())
             return;
-        }
 
-        if (this.hours.indexOf("-") !== -1) {
-            let rangeValues = this.hours.split("-");
-            rangeValues = rangeValues.map(p => p.trim());
 
-            let startHourIndex = parseInt(rangeValues[0]);
-            let endHourIndex = parseInt(rangeValues[1]);
-
-            if (isNaN(startHourIndex) || isNaN(endHourIndex)) {
-                return;
-            }
-
-            if (startHourIndex < 0 || startHourIndex > 23 ||
-                endHourIndex < 0 || endHourIndex > 23) {
-                return;
-            }
-
-            let count = 0;
-            for (let i = startHourIndex; count < 24; count++) {
-                this.hourNumbers[i] = true;
-
-                if (i == endHourIndex)
-                    break;
-
-                i++;
-                if (i > 23)
-                    i = 0;
-            }
-
+        if (this.extractRangeHoursOfDay())
             return;
-        }
 
         let singleItem = parseInt(this.hours);
         if (!isNaN(singleItem)) {
@@ -492,6 +464,66 @@ class CacheJob {
         }
 
         Logger.log("This job does not contain any valid hours to run. " + this.hours);
+    }
+
+    extractListHoursOfDay() {
+        if (this.hours.indexOf(",") === -1) {
+            return false;
+        }
+
+        let listValues = this.hours.split(",");
+        listValues = listValues.map(p => p.trim());
+
+        for (let hr of listValues) {
+            let hourIndex = parseInt(hr);
+            if (isNaN(hourIndex))
+                hourIndex = -1;
+
+            if (hourIndex < 0 || hourIndex > 23)
+                hourIndex = -1;
+
+
+            if (hourIndex !== -1) {
+                this.hourNumbers[hourIndex] = true;
+            }
+        }
+
+        return true;
+    }
+
+    extractRangeHoursOfDay() {
+        if (this.hours.indexOf("-") === -1) {
+            return false;
+        }
+
+        let rangeValues = this.hours.split("-");
+        rangeValues = rangeValues.map(p => p.trim());
+
+        let startHourIndex = parseInt(rangeValues[0]);
+        let endHourIndex = parseInt(rangeValues[1]);
+
+        if (isNaN(startHourIndex) || isNaN(endHourIndex)) {
+            return;
+        }
+
+        if (startHourIndex < 0 || startHourIndex > 23 ||
+            endHourIndex < 0 || endHourIndex > 23) {
+            return;
+        }
+
+        let count = 0;
+        for (let i = startHourIndex; count < 24; count++) {
+            this.hourNumbers[i] = true;
+
+            if (i == endHourIndex)
+                break;
+
+            i++;
+            if (i > 23)
+                i = 0;
+        }
+
+        return true;
     }
 
     getMinutesToNextRun() {
@@ -692,8 +724,6 @@ class CacheTrigger {
         }
 
         jobSettings.save(data);
-
-        return;
     }
 
     /**
@@ -968,8 +998,13 @@ class ThirdPartyFinance {
 
 function testGlobe() {
     let data = GlobeAndMail.getInfo("TSE:FTN-A");
+    Logger.log("Globe: FTN-A=" + data);
+
     data = GlobeAndMail.getInfo("TSE:HBF.B");
+    Logger.log("Globe HBF.B=" + data);
+
     data = GlobeAndMail.getInfo("TSE:MEG");
+    Logger.log("Globe MEG=" + data);
 }
 
 function testYahooDividend() {
