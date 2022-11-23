@@ -116,5 +116,8 @@
 ![Trigger Setup](img/ExampleStocks.png)
 
 *  Here are the suggested column titles.
-"CacheFinance Legend"	=CacheFinanceBoot()						
-"SymbolRange"	"Attribute"	"OutputRange"	"GoogleFinanceRange"	"Refresh Minutes"	"Hours"	"Days of Week"	"Trigger ID"
+
+| A | B | C | D | E | F | G | H |
+|---|---|---|---|---|---|---|---|
+| CacheFinance Legend | =CacheFinanceBoot() |
+|SymbolRange |	Attribute |	OutputRange | GoogleFinanceRange | Refresh Minutes | Hours | Days of Week |	Trigger ID |
