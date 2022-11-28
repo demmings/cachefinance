@@ -13,9 +13,9 @@ function CacheFinanceTrigger(e) {
 
     let cacheSettings = new CacheJobSettings();
 
-    //  On first run, it should create a job for every range specified in CACHEFINANCE legend.
-    cacheSettings.validateTriggerIDs();
-    cacheSettings.createMissingTriggers(60);
+    //  The trigger ID for THIS job is already disabled.  Send a signal to other
+    //  running jobs that THIS trigger is still going.
+    cacheSettings.signalTriggerRunState(e, true);
 
     //  Is this job specified in legend.
     /** @type {CacheJob} */
@@ -23,18 +23,19 @@ function CacheFinanceTrigger(e) {
 
     if (jobInfo === null && (typeof e !== 'undefined')) {
         //  This is a boot job that won't run again.
-        cacheSettings.deleteOldTrigger(e.triggerUid);
+        cacheSettings.firstRun(e.triggerUid);
         return;
     }
 
     //  Run job to update finance data.
-    if (CacheTrigger.runJob(jobInfo)) {
-        cacheSettings.deleteOldTrigger(jobInfo.triggerID);
-        cacheSettings.createTrigger(jobInfo, jobInfo.getMinutesToNextRun() * 60);
-    }
+    CacheTrigger.runJob(jobInfo);
 
-    //  If things go sideways, there are always leftover disabled triggers.
-    cacheSettings.cleanupDisabledTriggers();
+    //  Create new job and ensure all existing jobs are valid.
+    cacheSettings.afterRun(jobInfo);
+
+    //  Signal outside trigger that this ID is not running.
+    cacheSettings.signalTriggerRunState(e, false);
+
 }
 
 /**
@@ -71,6 +72,14 @@ function CacheFinanceBoot() {
 
 class CacheJobSettings {
     constructor() {
+        this.load(null);
+    }
+
+    /**
+     * 
+     * @param {CacheJob} currentJob 
+     */
+    load(currentJob) {
         const sheetNamedRange = SpreadsheetApp.getActiveSpreadsheet().getRangeByName(CACHE_LEGEND);
 
         if (sheetNamedRange === null) {
@@ -79,13 +88,20 @@ class CacheJobSettings {
             throw new Error("Named Range CACHEFINANCE not defined.");
         }
 
+        /** @type {CacheJob[]} */
         this.jobs = [];
+
         this.cacheInfo = sheetNamedRange.getValues();
 
         for (let job of this.cacheInfo) {
             let cacheJob = new CacheJob(job);
 
-            this.jobs.push(cacheJob);
+            if (currentJob !== null && cacheJob.triggerID === currentJob.triggerID) {
+                this.jobs.push(currentJob);
+            }
+            else {
+                this.jobs.push(cacheJob);
+            }
         }
     }
 
@@ -116,17 +132,71 @@ class CacheJobSettings {
         return false;
     }
 
+    /**
+     * 
+     * @param {String} triggerUid 
+     */
+    firstRun(triggerUid) {
+        //  On first run, it should create a job for every range specified in CACHEFINANCE legend.
+        this.validateTriggerIDs();
+        this.createMissingTriggers(true);
+
+        //  This is the BOOT trigger ID.
+        this.deleteOldTrigger(triggerUid);
+    }
+
+    /**
+     * 
+     * @param {CacheJob} jobInfo 
+     */
+    afterRun(jobInfo) {
+        //  Reload job table in case another trigger recently updated.
+        this.load(jobInfo);
+
+        this.deleteOldTrigger(jobInfo.triggerID);       //  Delete myself
+        jobInfo.triggerID = "";                         
+        this.cleanupDisabledTriggers();                 //  Delete triggers that ran, but not cleaned up.    
+        this.validateTriggerIDs();
+        this.createMissingTriggers(false);
+    }
+
+    //  Find trigger that are disabled and not associated with anything running.
     cleanupDisabledTriggers() {
         let validTriggerList = ScriptApp.getProjectTriggers();
         for (let trigger of validTriggerList) {
             // @ts-ignore
-            if (trigger.getHandlerFunction().toUpperCase() === 'CACHEFINANCETRIGGER' && trigger.isDisabled()) {
+            if (trigger.getHandlerFunction().toUpperCase() === 'CACHEFINANCETRIGGER' && trigger.isDisabled() &&
+                !this.isDisabledTriggerStillRunning(trigger.getUniqueId())) {
                 Logger.log("Trigger CLEANUP.  Deleting disabled trigger.");
                 ScriptApp.deleteTrigger(trigger);
             }
         }
     }
 
+    /**
+     * 
+     * @param {GoogleAppsScript.Events.TimeDriven} e 
+     * @param {Boolean} alive 
+     */
+    signalTriggerRunState(e, alive) {
+        if (typeof e === 'undefined') {
+            Logger.log("Trigger ID unknown.");
+            return null;
+        }
+
+        let key = CacheFinance.makeCacheKey("ALIVE", e.triggerUid);
+        const shortCache = CacheService.getScriptCache();
+        if (alive) {
+            shortCache.put(key, "ALIVE");
+        }
+        else {
+            if (shortCache.get(key) !== null) {
+                shortCache.remove(key);
+            }
+        }
+    }
+
+    //  Mark the job triggerID if not a valid trigger (in our job table.)
     validateTriggerIDs() {
         Logger.log("Starting validateTriggerIDs()");
 
@@ -145,6 +215,11 @@ class CacheJobSettings {
             }
 
             if (!good) {
+                //  It could be running.
+                if (this.isDisabledTriggerStillRunning(job.triggerID)) {
+                    continue;
+                }
+
                 Logger.log("Invalid Trigger ID=" + job.triggerID);
                 job.triggerID = "";
             }
@@ -152,6 +227,23 @@ class CacheJobSettings {
                 Logger.log("Valid Trigger ID=" + job.triggerID);
             }
         }
+    }
+
+    /**
+     * 
+     * @param {String} triggerID 
+     * @returns {Boolean}
+     */
+    isDisabledTriggerStillRunning(triggerID) {
+        const shortCache = CacheService.getScriptCache();
+
+        const key = CacheFinance.makeCacheKey("ALIVE", triggerID);
+        if (shortCache.get(key) !== null) {
+            Logger.log("Trigger ID=" + triggerID + " is RUNNING!");
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -178,13 +270,12 @@ class CacheJobSettings {
 
     /**
      * 
-     * @param {Number} startAfterSeconds 
+     * @param {Boolean} runAsap 
      */
-    createMissingTriggers(startAfterSeconds) {
+    createMissingTriggers(runAsap) {
         for (const job of this.jobs) {
             if (job.triggerID === "" && job.isValidJob()) {
-                this.createTrigger(job, startAfterSeconds);
-                startAfterSeconds += 60;
+                this.createTrigger(job, job.getMinutesToNextRun(runAsap) * 60);
             }
         }
     }
@@ -218,6 +309,9 @@ class CacheJobSettings {
         Logger.log("New Trigger Created. ID=" + job.triggerID + ". Attrib=" + job.attribute + ". Start in " + startAfterSeconds + " seconds.");
     }
 
+    /**
+     * Update job status data to sheet.
+     */
     updateFinanceCacheLegend() {
         let legend = [];
 
@@ -267,7 +361,7 @@ class CacheJobSettings {
                 Logger.log("Resuming Job: " + key + ". Items added=" + myJob.jobData.length);
             }
             else {
-                Logger.log("New Job.  CacheKey=" + key);
+                Logger.log("New Job.  Key=" + key);
             }
         }
 
@@ -315,10 +409,12 @@ class CacheJob {
 
         this.extractRunDaysOfWeek();
         this.extractHoursOfDay();
-
-        Logger.log("CACHEFINANCE JOB. Symbol=" + this.symbolRange + ". Attrib=" + this.attribute + ". Output=" + this.outputRange + ". Refresh=" + this.refreshMinutes);
     }
 
+    /**
+     * 
+     * @returns {Boolean}
+     */
     isValidJob() {
         return this.symbolRange !== '' && this.outputRange !== '' && this.attribute !== '' && this.dayNumbers.length > 0 && this.hourNumbers.length > 0;
     }
@@ -331,14 +427,26 @@ class CacheJob {
         this.jobData = data;
     }
 
+    /**
+     * 
+     * @param {Boolean} value 
+     */
     timedOut(value) {
         this.timeout = value;
     }
 
+    /**
+     * 
+     * @returns {Boolean}
+     */
     isRestarting() {
         return this.wasRestarted;
     }
 
+    /**
+     * Extract days that can be run from job legend into our job info.
+     * @returns 
+     */
     extractRunDaysOfWeek() {
         this.dayNumbers = [];
 
@@ -376,6 +484,10 @@ class CacheJob {
         Logger.log("Job does not contain any days of the week to run. " + this.days);
     }
 
+    /**
+     * 
+     * @returns {Boolean}
+     */
     extractListDaysOfWeek() {
         if (this.days.indexOf(",") === -1) {
             return false;
@@ -386,7 +498,7 @@ class CacheJob {
 
         for (let day of listValues) {
             let dayNameIndex = this.DAYNAMES.indexOf(day);
-            if (dayNameIndex == -1) {
+            if (dayNameIndex === -1) {
                 dayNameIndex = parseInt(day);
                 if (isNaN(dayNameIndex))
                     dayNameIndex = -1;
@@ -403,6 +515,10 @@ class CacheJob {
         return true;
     }
 
+    /**
+     * 
+     * @returns {Boolean}
+     */
     extractRangeDaysOfWeek() {
         if (this.days.indexOf("-") === -1) {
             return false;
@@ -413,7 +529,7 @@ class CacheJob {
 
         let startDayNameIndex = this.DAYNAMES.indexOf(rangeValues[0]);
         let endDayNameIndex = this.DAYNAMES.indexOf(rangeValues[1]);
-        if (startDayNameIndex == -1 || endDayNameIndex == -1) {
+        if (startDayNameIndex === -1 || endDayNameIndex === -1) {
             startDayNameIndex = parseInt(rangeValues[0]);
             endDayNameIndex = parseInt(rangeValues[1]);
 
@@ -426,7 +542,7 @@ class CacheJob {
         for (let i = startDayNameIndex; count < 7; count++) {
             this.dayNumbers[i] = true;
 
-            if (i == endDayNameIndex)
+            if (i === endDayNameIndex)
                 break;
 
             i++;
@@ -466,6 +582,10 @@ class CacheJob {
         Logger.log("This job does not contain any valid hours to run. " + this.hours);
     }
 
+    /**
+     * 
+     * @returns {Boolean}
+     */
     extractListHoursOfDay() {
         if (this.hours.indexOf(",") === -1) {
             return false;
@@ -491,6 +611,10 @@ class CacheJob {
         return true;
     }
 
+    /**
+     * 
+     * @returns {Boolean}
+     */
     extractRangeHoursOfDay() {
         if (this.hours.indexOf("-") === -1) {
             return false;
@@ -515,7 +639,7 @@ class CacheJob {
         for (let i = startHourIndex; count < 24; count++) {
             this.hourNumbers[i] = true;
 
-            if (i == endHourIndex)
+            if (i === endHourIndex)
                 break;
 
             i++;
@@ -526,8 +650,14 @@ class CacheJob {
         return true;
     }
 
-    getMinutesToNextRun() {
-        let minutes = this.refreshMinutes < 1 ? 1 : this.refreshMinutes;
+    /**
+     * 
+     * @param {Boolean} runAsap 
+     * @returns {Number}
+     */
+    getMinutesToNextRun(runAsap = false) {
+        let minutes = this.refreshMinutes < 1 || runAsap ? 1 : this.refreshMinutes;
+
         // Get current date
         const startDateTime = new Date();
         let daysSinceStart = 0;
@@ -647,7 +777,7 @@ class CacheTrigger {
         }
 
         if (!jobSettings.canRunJob()) {
-            Logger.log("Not time to run JOB.")
+            Logger.log("* * *   Not time to run JOB   * * *");
             return true;
         }
 
@@ -687,7 +817,7 @@ class CacheTrigger {
 
         const attribute = jobSettings.attribute;
 
-        if (googleValuesNamedRange != null && symbols.length !== defaultData.length) {
+        if (googleValuesNamedRange !== null && symbols.length !== defaultData.length) {
             Logger.log("Symbol Ranges and Google Values Ranges must be the same: " + jobSettings.symbolRange + ". Len=" + symbols.length + ".  GoogleValues: " + jobSettings.defaultRange + ". Len=" + defaultData.length);
             return;
         }
@@ -712,11 +842,9 @@ class CacheTrigger {
 
             let value;
             if (googleValuesNamedRange === null) {
-                Logger.log("symbol=" + symbols[i][0]);
                 value = CACHEFINANCE(symbols[i][0], attribute);
             }
             else {
-                Logger.log("symbol=" + symbols[i][0] + ". Default=" + defaultData[i][0]);
                 value = CACHEFINANCE(symbols[i][0], attribute, defaultData[i][0]);
             }
 
@@ -878,8 +1006,6 @@ class CacheFinance {
         const longCache = new ScriptSettings();
         let start = new Date().getTime();
 
-        Logger.log("GoogleFinance VALUE set to Long/Short Cache. Key=" + key + ".  Value=" + financialData);
-
         const currentShortCacheValue = shortCache.get(key);
         if (currentShortCacheValue !== null && JSON.parse(currentShortCacheValue) === financialData) {
             Logger.log("GoogleFinance VALUE.  No Change in SHORT Cache. ms=" + (new Date().getTime() - start));
@@ -888,20 +1014,20 @@ class CacheFinance {
 
         if (currentShortCacheValue !== null)
             Logger.log("Short Cache Changed.  Old=" + JSON.parse(currentShortCacheValue) + " . New=" + financialData);
-
-        start = new Date().getTime();
-
+   
         //  If we normally get the price from Google, we want to cache for a longer
         //  time because the only time we need a price for this particular stock
         //  is when GOOGLEFINANCE fails.
-        shortCache.put(key, JSON.stringify(financialData), shortCacheSeconds);
-
-        Logger.log("Time to put in short cache: " + (new Date().getTime() - start));
         start = new Date().getTime();
-
+        shortCache.put(key, JSON.stringify(financialData), shortCacheSeconds);
+        const shortMs = new Date().getTime() - start;
+       
         //  For emergency cases when GOOGLEFINANCE is down long term...
+        start = new Date().getTime();
         longCache.put(key, financialData, 7);
-        Logger.log("Time to put in long cache: " + (new Date().getTime() - start));
+        const longMs = new Date().getTime() - start;
+
+        Logger.log("SET GoogleFinance VALUE Long/Short Cache. Key=" + key + ".  Value=" + financialData + ". Short ms=" + shortMs + ". Long ms=" + longMs);
     }
 }
 
@@ -981,6 +1107,11 @@ class ThirdPartyFinance {
         return data;
     }
 
+    /**
+     * 
+     * @param {String} symbol 
+     * @returns {StockAttributes}
+     */
     static getName(symbol) {
         /** @type {StockAttributes} */
         let data = GlobeAndMail.getInfo(symbol);
@@ -996,6 +1127,7 @@ class ThirdPartyFinance {
 
 }
 
+//  Testing globe and mail.
 function testGlobe() {
     let data = GlobeAndMail.getInfo("TSE:FTN-A");
     Logger.log("Globe: FTN-A=" + data);
@@ -1007,22 +1139,25 @@ function testGlobe() {
     Logger.log("Globe MEG=" + data);
 }
 
+//  Testing Yahoo
 function testYahooDividend() {
     let div = YahooFinance.getInfo("NYSEARCA:SHYG");
     Logger.log("Dividend NYSEARCA:SHYG=" + div);
 }
 
+//  Testing TD
 function testgetTDmarketResearchName() {
     let coName = TdMarketResearch.getInfo("ZTL");
 
     Logger.log("Name of ZtL: " + coName);
 }
 
+//  Testing TD 2.
 function testTD() {
     TdMarketResearch.getInfo("TSE:DFN-A", "STOCK");
 }
 
-
+//  Testing TD 3.
 function testgetTDmarketResearchPrice() {
     TdMarketResearch.getInfo("ZTL", "ETF");
 }
@@ -1038,7 +1173,7 @@ class TdMarketResearch {
         let data = new StockAttributes();
 
         let URL;
-        if (type == "ETF")
+        if (type === "ETF")
             URL = "https://marketsandresearch.td.com/tdwca/Public/ETFsProfile/Summary/ca/" + TdMarketResearch.getTicker(symbol);
         else
             URL = "https://marketsandresearch.td.com/tdwca/Public/Stocks/Overview/ca/" + TdMarketResearch.getTicker(symbol);
@@ -1058,7 +1193,7 @@ class TdMarketResearch {
         if (parts === null) {
             parts = html.match(/.Dividend Yield\<\/div\>.*?cell-container contains\"\>(\d*\.?\d*)\%/);
         }
-        if (parts !== null && parts.length == 2) {
+        if (parts !== null && parts.length === 2) {
             let tempPct = parts[1];
 
             let parsedValue = parseFloat(tempPct) / 100;
@@ -1070,13 +1205,13 @@ class TdMarketResearch {
 
         //  Get the name.
         parts = html.match(/.\<span class=\"issueName\"\>(.*?)\<\//);
-        if (parts !== null && parts.length == 2) {
+        if (parts !== null && parts.length === 2) {
             data.stockName = parts[1];
         }
 
         //  Get the price.
         parts = html.match(/.LAST PRICE\<\/span\>\<div\>\<span\>(\d*\.?\d*)\</);
-        if (parts !== null && parts.length == 2) {
+        if (parts !== null && parts.length === 2) {
 
             let parsedValue = parseFloat(parts[1]);
             if (!isNaN(parsedValue)) {
@@ -1109,7 +1244,6 @@ class TdMarketResearch {
     }
 }
 
-
 class YahooFinance {
     /**
      * 
@@ -1127,7 +1261,7 @@ class YahooFinance {
 
         let dividendPercent = html.match(/.TD_YIELD-value\"\>(\d*\.?\d*)\%/);
 
-        if (dividendPercent !== null && dividendPercent.length == 2) {
+        if (dividendPercent !== null && dividendPercent.length === 2) {
             const tempPct = dividendPercent[1];
             Logger.log("PERCENT=" + tempPct);
 
@@ -1189,7 +1323,7 @@ class GlobeAndMail {
         if (parts === null)
             parts = html.match(/.name=\\\"dividendYieldTrailing\\\".*?value=\\\"(\d*\.?\d*)\%/);
 
-        if (parts !== null && parts.length == 2) {
+        if (parts !== null && parts.length === 2) {
             let tempPct = parts[1];
 
             let parsedValue = parseFloat(tempPct) / 100;
@@ -1201,13 +1335,13 @@ class GlobeAndMail {
 
         //  Get the name.
         parts = html.match(/.\"symbolName\":\"(.*?)\"/);
-        if (parts !== null && parts.length == 2) {
+        if (parts !== null && parts.length === 2) {
             data.stockName = parts[1];
         }
 
         //  Get the price.
         parts = html.match(/.\"lastPrice\":\"(\d*\.?\d*)\"/);
-        if (parts !== null && parts.length == 2) {
+        if (parts !== null && parts.length === 2) {
 
             let parsedValue = parseFloat(parts[1]);
             if (!isNaN(parsedValue)) {
@@ -1215,11 +1349,9 @@ class GlobeAndMail {
             }
         }
 
-
         return data;
     }
-
-    //  
+ 
     /**
      * Clean up ticker symbol for use in Globe and Mail lookups.
      * @param {String} symbol 
@@ -1237,7 +1369,7 @@ class GlobeAndMail {
                     if (parts[1].indexOf(".") !== -1) {
                         symbol = parts[1].replace(".", "-");
                     }
-                    else if (parts[1].indexOf("-") != -1) {
+                    else if (parts[1].indexOf("-") !== -1) {
                         const prefShare = parts[1].split("-");
                         symbol = prefShare[0] + "-PR-" + prefShare[1];
                     }

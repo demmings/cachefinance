@@ -7,6 +7,7 @@
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=demmings_cachefinance&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=demmings_cachefinance)
 [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=demmings_cachefinance&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=demmings_cachefinance)
 [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=demmings_cachefinance&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=demmings_cachefinance)
+[![DeepSource](https://deepsource.io/gh/demmings/cachefinance.svg/?label=active+issues&show_trend=true&token=uIplDc6IW1XQfmDks0l97l4C)](https://deepsource.io/gh/demmings/cachefinance/?ref=repository-badge)
 
 
 ---
