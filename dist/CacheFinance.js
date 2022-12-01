@@ -1266,7 +1266,7 @@ class YahooFinance {
         Logger.log("getStockDividendYield:  " + symbol);
         Logger.log("URL = " + URL);
 
-        const dividendPercent = html.match(/TD_YIELD-value">(\d*\.?\d*)%/);
+        const dividendPercent = html.match(/TD_YIELD-value">(\d*\.\d*)%/);
 
         if (dividendPercent !== null && dividendPercent.length === 2) {
             const tempPct = dividendPercent[1];
