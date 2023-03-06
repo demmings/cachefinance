@@ -66,11 +66,20 @@
      * However, in my testing it seems to happen more often when you are doing a large number of finance lookups. 
 * **SYNTAX**.
     *  ```CACHEFINANCE(symbol, attribute, defaultValue)```
-    *  symbol - stock symbol using regular GOOGLEFINANCE conventions.
-    *  attribute - three supporte attributes for now "price", "yieldpct", "name".
-    *  defaultValue - Use GOOGLEFINANCE() to supply this value either directly or using a CELL that contains the GOOGLEFINANCE value.
-        *  'yieldpct' does not work for STOCKS and ETF's in GOOGLEFINANCE, so don't supply the third parameter when using that attribute.
-    *  Example: (symbol that is not recognized by GOOGLEFINANCE)
+    * **symbol** - stock symbol using regular GOOGLEFINANCE conventions.
+    * **attribute** - three supported attributes doing 3'rd party website lookups:  
+       * "price" 
+       * "yieldpct"
+       * "name".
+      * You can specify other attributes that GOOGLEFINANCE uses, but the CacheFinance() function will not look up this data if GOOGLEFINANCE does not provide an initial default value.
+      * This ATTRIBUTE name in this case is used to create our CACHE key, so its name is not important - other than when the function does a cache lookup using this key (which is made by **attribute + "|" + symbol**)
+      * The following "low52" does not lookup 3'rd party website data, it will just save any value returned by GOOGLEFINANCE to cache, for the case when GOOGLEFINANCE fails to work:
+    ```
+        =CACHEFINANCE("TSE:ZIC","low52", GOOGLEFINANCE("TSE:ZIC", "low52"))
+    ```
+    * **defaultValue** - Use GOOGLEFINANCE() to supply this value either directly or using a CELL that contains the GOOGLEFINANCE value.
+      * 'yieldpct' does not work for STOCKS and ETF's in GOOGLEFINANCE, so don't supply the third parameter when using that attribute.
+    * Example: (symbol that is not recognized by GOOGLEFINANCE)
         *  ```=CACHEFINANCE("TSE:ZTL", "price", GOOGLEFINANCE("TSE:ZTL", "price"))```
 
 
