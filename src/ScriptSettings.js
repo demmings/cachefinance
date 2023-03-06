@@ -4,7 +4,8 @@ export { ScriptSettings };
 import { PropertiesService } from "./SqlTest.js";
 //  *** DEBUG END  ***/
 
-class ScriptSettings {
+/** Stores settings for the SCRIPT.  Long term cache storage for small tables.  */
+class ScriptSettings {      //  skipcq: JS-0128
     /**
      * For storing cache data for very long periods of time.
      */
@@ -91,6 +92,7 @@ class ScriptSettings {
     }
 }
 
+/** Converts data into JSON for getting/setting in ScriptSettings. */
 class PropertyData {
     /**
      * 
@@ -109,7 +111,7 @@ class PropertyData {
     /**
      * 
      * @param {PropertyData} obj 
-     * @returns 
+     * @returns {any}
      */
     static getData(obj) {
         let value = null;
@@ -127,7 +129,7 @@ class PropertyData {
     /**
      * 
      * @param {PropertyData} obj 
-     * @returns 
+     * @returns {Boolean}
      */
     static isExpired(obj) {
         const someDate = new Date();

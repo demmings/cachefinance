@@ -1046,7 +1046,7 @@ class ThirdPartyFinance {
      * @returns {StockAttributes}
      */
     static get(symbol, attribute) {
-        let data = null;
+        let data = new StockAttributes();
 
         switch (attribute) {
             case "PRICE":
@@ -1062,8 +1062,8 @@ class ThirdPartyFinance {
                 break;
 
             default:
-                Logger.log("Invalid FINANCE attribute: " + attribute);
-                throw new Error("Invalid attribute:" + attribute);
+                Logger.log("3'rd Party FINANCE attribute not supported: " + attribute);
+                break;
         }
 
         if (data.stockPrice !== null)
@@ -1422,8 +1422,7 @@ class StockAttributes {
                 return (this.stockName === null) ? "" : this.stockName;
 
             default:
-                Logger.log("Invalid FINANCE attribute: " + attribute);
-                throw new Error("Invalid attribute:" + attribute);
+                return '#N/A';
         }
     }
 
@@ -1444,8 +1443,7 @@ class StockAttributes {
                 return this.stockName !== null;
 
             default:
-                Logger.log("Invalid FINANCE attribute: " + attribute);
-                throw new Error("Invalid attribute:" + attribute);
+                return false;
         }
     }
 }
@@ -1459,7 +1457,8 @@ export { ScriptSettings };
 import { PropertiesService } from "./SqlTest.js";
 //  *** DEBUG END  ***/
 
-class ScriptSettings {
+/** Stores settings for the SCRIPT.  Long term cache storage for small tables.  */
+class ScriptSettings {      //  skipcq: JS-0128
     /**
      * For storing cache data for very long periods of time.
      */
@@ -1546,6 +1545,7 @@ class ScriptSettings {
     }
 }
 
+/** Converts data into JSON for getting/setting in ScriptSettings. */
 class PropertyData {
     /**
      * 
@@ -1564,7 +1564,7 @@ class PropertyData {
     /**
      * 
      * @param {PropertyData} obj 
-     * @returns 
+     * @returns {any}
      */
     static getData(obj) {
         let value = null;
@@ -1582,7 +1582,7 @@ class PropertyData {
     /**
      * 
      * @param {PropertyData} obj 
-     * @returns 
+     * @returns {Boolean}
      */
     static isExpired(obj) {
         const someDate = new Date();

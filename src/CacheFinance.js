@@ -1046,7 +1046,7 @@ class ThirdPartyFinance {
      * @returns {StockAttributes}
      */
     static get(symbol, attribute) {
-        let data = null;
+        let data = new StockAttributes();
 
         switch (attribute) {
             case "PRICE":
@@ -1062,8 +1062,8 @@ class ThirdPartyFinance {
                 break;
 
             default:
-                Logger.log("Invalid FINANCE attribute: " + attribute);
-                throw new Error("Invalid attribute:" + attribute);
+                Logger.log("3'rd Party FINANCE attribute not supported: " + attribute);
+                break;
         }
 
         if (data.stockPrice !== null)
@@ -1422,8 +1422,7 @@ class StockAttributes {
                 return (this.stockName === null) ? "" : this.stockName;
 
             default:
-                Logger.log("Invalid FINANCE attribute: " + attribute);
-                throw new Error("Invalid attribute:" + attribute);
+                return '#N/A';
         }
     }
 
@@ -1444,8 +1443,7 @@ class StockAttributes {
                 return this.stockName !== null;
 
             default:
-                Logger.log("Invalid FINANCE attribute: " + attribute);
-                throw new Error("Invalid attribute:" + attribute);
+                return false;
         }
     }
 }
