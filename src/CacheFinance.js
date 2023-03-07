@@ -111,6 +111,7 @@ class CacheJobSettings {
     /**
      * 
      * Adds 'CacheFinanceTrigger' function to triggers.
+     * @returns {Boolean} - true = created
      */
     static bootstrapTrigger() {
         let missingTrigger = true;
@@ -138,6 +139,7 @@ class CacheJobSettings {
     /**
      * 
      * @param {String} triggerUid 
+     * @returns {void}
      */
     firstRun(triggerUid) {
         //  On first run, it should create a job for every range specified in CACHEFINANCE legend.
@@ -151,6 +153,7 @@ class CacheJobSettings {
     /**
      * 
      * @param {CacheJob} jobInfo 
+     * @returns {void}
      */
     afterRun(jobInfo) {
         //  Reload job table in case another trigger recently updated.
@@ -158,13 +161,16 @@ class CacheJobSettings {
 
         CacheJobSettings.deleteOldTrigger(jobInfo.triggerID);       //  Delete myself
         jobInfo.triggerID = "";                         
-        this.cleanupDisabledTriggers();                 //  Delete triggers that ran, but not cleaned up.    
+        CacheJobSettings.cleanupDisabledTriggers();                 //  Delete triggers that ran, but not cleaned up.    
         this.validateTriggerIDs();
         this.createMissingTriggers(false);
     }
 
-    //  Find trigger that are disabled and not associated with anything running.
-    cleanupDisabledTriggers() {
+    /**
+     * Find trigger that are disabled and not associated with anything running.
+     * @returns {void}
+     */
+    static cleanupDisabledTriggers() {
         const validTriggerList = ScriptApp.getProjectTriggers();
         for (const trigger of validTriggerList) {
             // @ts-ignore
@@ -200,7 +206,10 @@ class CacheJobSettings {
         }
     }
 
-    //  Mark the job triggerID if not a valid trigger (in our job table.)
+    /**
+     * Mark the job triggerID if not a valid trigger (in our job table.)
+     * @returns {void}
+     */
     validateTriggerIDs() {
         Logger.log("Starting validateTriggerIDs()");
 
@@ -243,7 +252,7 @@ class CacheJobSettings {
 
         const key = CacheFinance.makeCacheKey("ALIVE", triggerID);
         if (shortCache.get(key) !== null) {
-            Logger.log("Trigger ID=" + triggerID + " is RUNNING!");
+            Logger.log(`Trigger ID=${triggerID} is RUNNING!`);
             return true;
         }
 
@@ -253,6 +262,7 @@ class CacheJobSettings {
     /**
      * 
      * @param {any} triggerID 
+     * @returns {void}
      */
     static deleteOldTrigger(triggerID) {
         const triggers = ScriptApp.getProjectTriggers();
@@ -275,6 +285,7 @@ class CacheJobSettings {
     /**
      * 
      * @param {Boolean} runAsap 
+     * @returns {void}
      */
     createMissingTriggers(runAsap) {
         for (const job of this.jobs) {
@@ -288,6 +299,7 @@ class CacheJobSettings {
      * 
      * @param {CacheJob} job 
      * @param {Number} startAfterSeconds 
+     * @returns {void}
      */
     createTrigger(job, startAfterSeconds) {
         if (job.timeout) {
@@ -315,6 +327,7 @@ class CacheJobSettings {
 
     /**
      * Update job status data to sheet.
+     * @returns {void}
      */
     updateFinanceCacheLegend() {
         const legend = [];
@@ -449,7 +462,7 @@ class CacheJob {
 
     /**
      * Extract days that can be run from job legend into our job info.
-     * @returns 
+     * @returns {void}
      */
     extractRunDaysOfWeek() {
         this.dayNumbers = [];
@@ -559,7 +572,7 @@ class CacheJob {
 
     /**
      * Parse HOURS set in legend into 24 hour true/false array.
-     * @returns 
+     * @returns {void}
      */
     extractHoursOfDay() {
         this.hourNumbers = [];
@@ -581,7 +594,7 @@ class CacheJob {
         if (this.extractRangeHoursOfDay())
             return;
 
-        const singleItem = parseInt(this.hours);
+        const singleItem = parseInt(this.hours, 10);
         if (!isNaN(singleItem)) {
             this.hourNumbers[singleItem] = true;
             return;
@@ -800,6 +813,7 @@ class CacheTrigger {
     /**
      * 
      * @param {CacheJob} jobSettings 
+     * @returns {void}
      */
     static getJobData(jobSettings) {
         const MAX_RUN_SECONDS = 300;
@@ -865,7 +879,7 @@ class CacheTrigger {
     /**
      * 
      * @param {CacheJob} jobSettings 
-     * @returns 
+     * @returns {Boolean}
      */
     static writeResults(jobSettings) {
         if (jobSettings.jobData === null || jobSettings.timeout)
@@ -949,7 +963,7 @@ class CacheFinance {
      * @returns {String}
      */
     static makeCacheKey(symbol, attribute) {
-        return attribute + "|" + symbol;
+        return `${attribute}|${symbol}`;
     }
 
     /**
@@ -991,6 +1005,7 @@ class CacheFinance {
      * 
      * @param {String} symbol 
      * @param {StockAttributes} stockAttributes 
+     * @returns {void}
      */
     static saveAllFinanceValuesToCache(symbol, stockAttributes) {
         if (stockAttributes === null)
@@ -1008,6 +1023,7 @@ class CacheFinance {
      * @param {String} key 
      * @param {any} financialData 
      * @param {Number} shortCacheSeconds 
+     * @returns {void}
      */
     static saveFinanceValueToCache(key, financialData, shortCacheSeconds = 1200) {
         const shortCache = CacheService.getScriptCache();
@@ -1182,9 +1198,9 @@ class TdMarketResearch {
 
         let URL = null;
         if (type === "ETF")
-            URL = "https://marketsandresearch.td.com/tdwca/Public/ETFsProfile/Summary/ca/" + TdMarketResearch.getTicker(symbol);
+            URL = `https://marketsandresearch.td.com/tdwca/Public/ETFsProfile/Summary/ca/${TdMarketResearch.getTicker(symbol)}`;
         else
-            URL = "https://marketsandresearch.td.com/tdwca/Public/Stocks/Overview/ca/" + TdMarketResearch.getTicker(symbol);
+            URL = `https://marketsandresearch.td.com/tdwca/Public/Stocks/Overview/ca/${TdMarketResearch.getTicker(symbol)}`;
 
         let html = null;
         try {
@@ -1261,7 +1277,7 @@ class YahooFinance {
     static getInfo(symbol) {
         const data = new StockAttributes();
 
-        const URL = "https://finance.yahoo.com/quote/" + YahooFinance.getTicker(symbol);
+        const URL = `https://finance.yahoo.com/quote/${YahooFinance.getTicker(symbol)}`;
 
         const html = UrlFetchApp.fetch(URL).getContentText();
         Logger.log(`getStockDividendYield:  ${symbol}`);
@@ -1379,7 +1395,7 @@ class GlobeAndMail {
                     }
                     else if (parts[1].indexOf("-") !== -1) {
                         const prefShare = parts[1].split("-");
-                        symbol = prefShare[0] + "-PR-" + prefShare[1];
+                        symbol = `${prefShare[0]}-PR-${prefShare[1]}`;
                     }
                     symbol = `${symbol}-T`;
                     break;
