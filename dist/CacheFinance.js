@@ -1,8 +1,5 @@
 const GOOGLEFINANCE_PARAM_NOT_USED = "##NotSet##";
 
-//  Named range in sheet with CacheFinance configurations.
-const CACHE_LEGEND = "CACHEFINANCE";
-
 /**
  * Replacement function to GOOGLEFINANCE for stock symbols not recognized by google.
  * @param {string} symbol 
@@ -416,7 +413,7 @@ class ThirdPartyFinance {
     static getTickerCountryCode(symbol) {
         const colon = symbol.indexOf(":");
         let exchange = "";
-        let countryCode = "ca";
+        let countryCode = "";
 
         if (colon < 0) {
             return countryCode;
@@ -428,8 +425,21 @@ class ThirdPartyFinance {
         switch(exchange) {
             case "NASDAQ":
             case "NYSEARCA":
+            case "NYSE":
+            case "NYSEAMERICAN":
+            case "OPRA":
+            case "OTCMKTS":
                 countryCode = "us";
-                break;   
+                break;  
+            case "CVE":
+            case "TSE":
+            case "TSX":
+            case "TSXV":
+                countryCode = "ca";
+                break;
+            default:
+                countryCode = "us";
+                break; 
         }
 
         return countryCode;
@@ -830,11 +840,12 @@ class CacheFinanceTestRun {
     getTestRunResults() {
         const resultTable = [];
 
+        /** @type {any[]} */
         let row = ["Service", "Symbol", "Status", "Price", "Yield", "Name", "Type", "Run Time(ms)"];
         resultTable.push(row);
 
-        for (let testRun of this.testRuns) {
-            let row = [];
+        for (const testRun of this.testRuns) {
+            row = [];
 
             row.push(testRun.serviceName);
             row.push(testRun.symbol);

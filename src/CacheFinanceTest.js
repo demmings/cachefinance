@@ -91,11 +91,12 @@ class CacheFinanceTestRun {
     getTestRunResults() {
         const resultTable = [];
 
+        /** @type {any[]} */
         let row = ["Service", "Symbol", "Status", "Price", "Yield", "Name", "Type", "Run Time(ms)"];
         resultTable.push(row);
 
-        for (let testRun of this.testRuns) {
-            let row = [];
+        for (const testRun of this.testRuns) {
+            row = [];
 
             row.push(testRun.serviceName);
             row.push(testRun.symbol);

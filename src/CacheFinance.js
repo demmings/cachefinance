@@ -1,8 +1,5 @@
 const GOOGLEFINANCE_PARAM_NOT_USED = "##NotSet##";
 
-//  Named range in sheet with CacheFinance configurations.
-const CACHE_LEGEND = "CACHEFINANCE";
-
 /**
  * Replacement function to GOOGLEFINANCE for stock symbols not recognized by google.
  * @param {string} symbol 

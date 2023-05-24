@@ -95,7 +95,7 @@ class ThirdPartyFinance {
     static getTickerCountryCode(symbol) {
         const colon = symbol.indexOf(":");
         let exchange = "";
-        let countryCode = "ca";
+        let countryCode = "";
 
         if (colon < 0) {
             return countryCode;
@@ -107,8 +107,21 @@ class ThirdPartyFinance {
         switch(exchange) {
             case "NASDAQ":
             case "NYSEARCA":
+            case "NYSE":
+            case "NYSEAMERICAN":
+            case "OPRA":
+            case "OTCMKTS":
                 countryCode = "us";
-                break;   
+                break;  
+            case "CVE":
+            case "TSE":
+            case "TSX":
+            case "TSXV":
+                countryCode = "ca";
+                break;
+            default:
+                countryCode = "us";
+                break; 
         }
 
         return countryCode;

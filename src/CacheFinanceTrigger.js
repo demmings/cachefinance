@@ -1,3 +1,6 @@
+//  Named range in sheet with CacheFinance configurations.
+const CACHE_LEGEND = "CACHEFINANCE";
+
 /**
  * Add this to App Script Trigger.
  * It requires a named range in your sheet called 'CACHEFINANCE'
@@ -30,9 +33,7 @@ function CacheFinanceTrigger(e) {                           //  skipcq: JS-0128
 
     //  Signal outside trigger that this ID is not running.
     CacheJobSettings.signalTriggerRunState(e, false);
-
 }
-
 
 /**
  * Add a custom function to your sheet to get the Trigger(s) installed.
