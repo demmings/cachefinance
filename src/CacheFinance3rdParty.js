@@ -163,7 +163,9 @@ class TdMarketResearch {
         }
 
         //  Get the price.
-        parts = html.match(/.LAST PRICE<\/span<div><span>(\d*\.?\d*)</);
+        // parts = html.match(/.LAST PRICE<\/span><div><span>(\d*\.?\d*)</);
+        parts = html.match(/.LAST PRICE\<\/span\>\<div\>\<span\>(\d*\.?\d*)\</);
+
         if (parts !== null && parts.length === 2) {
 
             const parsedValue = parseFloat(parts[1]);
