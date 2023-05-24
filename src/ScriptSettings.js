@@ -1,10 +1,11 @@
-//  Remove comments for testing in NODE
 /*  *** DEBUG START ***
+//  Remove comments for testing in NODE
 export { ScriptSettings };
 import { PropertiesService } from "./SqlTest.js";
-//  *** DEBUG END  ***/
+//  *** DEBUG END ***/
 
-/** Stores settings for the SCRIPT.  Long term cache storage for small tables.  */
+/** @classdesc 
+ * Stores settings for the SCRIPT.  Long term cache storage for small tables.  */
 class ScriptSettings {      //  skipcq: JS-0128
     /**
      * For storing cache data for very long periods of time.
@@ -58,10 +59,7 @@ class ScriptSettings {      //  skipcq: JS-0128
      */
     putAll(propertyDataObject, daysToHold = 1) {
         const keys = Object.keys(propertyDataObject);
-
-        for (const key of keys) {
-            this.put(key, propertyDataObject[key], daysToHold);
-        }
+        keys.forEach(key => this.put(key, propertyDataObject[key], daysToHold));
     }
 
     /**
@@ -116,8 +114,9 @@ class PropertyData {
     static getData(obj) {
         let value = null;
         try {
-            if (!PropertyData.isExpired(obj))
+            if (!PropertyData.isExpired(obj)) {
                 value = JSON.parse(obj.myData);
+            }
         }
         catch (ex) {
             Logger.log(`Invalid property value.  Not JSON: ${ex.toString()}`);

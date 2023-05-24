@@ -30,13 +30,30 @@
 # Installing
 
 * Copy files manually.
-* In the ./dist folder there is **ONE** required file:
-    * CacheFinance.js  
-    * This file is an amalgamation of all files in the **/src** folder
-    * None of the files in ./src are required if you use **dist/CacheFinance.js**
-* **OR** in the ./src folder there are **TWO** required files:
+* In the ./dist folder there are two files.  Only one is required.  Choose only **ONE** of the files based on your needs:
+    * **CacheFinance.js**  
+      * Caches GOOGLEFINANCE results AND does 3'rd party website lookups when all else fails.
+        * This file is an amalgamation of the following files in the **/src** folder
+          * CacheFinance.js
+          * CacheFinance3rdParty.js
+          * CacheFinanceTest.js
+          * ScriptSettings.js
+      * None of the files in ./src are required if you use **dist/CacheFinance.js**
+    * **CacheFinanceTrigger.js**
+      * All of the functionality of **CacheFinance.js**  PLUS  use a trigger to pull your data.
+        * This file is an amalgamation of the following files in the **/src** folder
+          * CacheFinanceTrigger.js
+          * CacheFinance.js
+          * CacheFinance3rdParty.js
+          * CacheFinanceTest.js
+          * ScriptSettings.js 
+      * None of the files in ./src are required if you use **dist/CacheFinanceTrigger.js**
+* **OR** in the ./src folder copy the files (more work, not recomended).
+    * CacheFinanceTrigger.js
     * CacheFinance.js
-    * ScriptSettings.js
+    * CacheFinance3rdParty.js
+    * CacheFinanceTest.js
+    * ScriptSettings.js 
 * The simple approach is to copy and paste each file.
     * From your sheets Select **Extensions** and then **Apps Script**
     * Ensure that Editor is selected.  It is the **< >**
@@ -70,7 +87,9 @@
     * **attribute** - three supported attributes doing 3'rd party website lookups:  
        * "price" 
        * "yieldpct"
-       * "name".
+       * "name"
+       * "test" -  special case.  Lists in a table results of tests to third party finance sites.
+         * ```CACHEFINANCE("", "TEST")```
       * You can specify other attributes that GOOGLEFINANCE uses, but the CacheFinance() function will not look up this data if GOOGLEFINANCE does not provide an initial default value.
       * This ATTRIBUTE name in this case is used to create our CACHE key, so its name is not important - other than when the function does a cache lookup using this key (which is made by **attribute + "|" + symbol**)
       * The following "low52" does not lookup 3'rd party website data, it will just save any value returned by GOOGLEFINANCE to cache, for the case when GOOGLEFINANCE fails to work:
