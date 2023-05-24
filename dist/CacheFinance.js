@@ -898,39 +898,73 @@ class CacheFinanceTestStatus {
         return this._typeLookup;
     }
 
+    /**
+     * 
+     * @param {String} val 
+     * @returns {CacheFinanceTestStatus}
+     */
     setServiceName(val) {
         this._serviceName = val;
         return this;
     }
+
+    /**
+     * 
+     * @param {String} val 
+     * @returns {CacheFinanceTestStatus}
+     */
     setSymbol(val) {
         this._symbol = val;
         return this;
     }
+
+    /**
+     * 
+     * @param {any} val 
+     * @returns {CacheFinanceTestStatus}
+     */
     setValue(val) {
         this._value = val;
         return this;
     }
+
+    /**
+     * 
+     * @param {String} val 
+     * @returns {CacheFinanceTestStatus}
+     */
     setStatus(val) {
         this._status = val;
         return this;
     }
-    setRunTime(val) {
-        this._runTime = val;
-        return this;
-    }
+
+    /**
+     * 
+     * @param {String} val 
+     * @returns {CacheFinanceTestStatus}
+     */
     setTypeLookup(val) {
         this._typeLookup = val;
         return this;
     }
+
     /**
      * 
      * @param {StockAttributes} val 
+     * @returns {CacheFinanceTestStatus}
      */
     setStockAttributes(val) {
         this._stockAttributes = val;
+        return this;
     }
+
+    /**
+     * 
+     * @returns {CacheFinanceTestStatus}
+     */
     finishTimer() {
         this._runTime = Date.now() - this._startTime;
+        return this;
     }
 }
 
