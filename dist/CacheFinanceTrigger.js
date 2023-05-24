@@ -1315,14 +1315,9 @@ class ThirdPartyFinance {
 
         switch(exchange) {
             case "NASDAQ":
-                countryCode = "us";
-                break;
             case "NYSEARCA":
                 countryCode = "us";
-                break;
-            case "TSE":
-                countryCode = "ca";
-                break;
+                break;   
         }
 
         return countryCode;
@@ -1356,9 +1351,9 @@ class TdMarketResearch {
         Logger.log(`URL = ${URL}`);
 
         //  Get the dividend yield.
-        let parts = html.match(/.Dividend Yield<\/th><td class=\"last\">(\d*\.?\d*)\%/);
+        let parts = html.match(/.Dividend Yield<\/th><td class="last">(\d*\.?\d*)\%/);
         if (parts === null) {
-            parts = html.match(/.Dividend Yield<\/div>.*?cell-container contains\">(\d*\.?\d*)\%/);
+            parts = html.match(/.Dividend Yield<\/div>.*?cell-container contains">(\d*\.?\d*)%/);
         }
         if (parts !== null && parts.length === 2) {
             const tempPct = parts[1];
@@ -1371,13 +1366,13 @@ class TdMarketResearch {
         }
 
         //  Get the name.
-        parts = html.match(/.\<span class=\"issueName\"\>(.*?)\<\//);
+        parts = html.match(/.\<span class=\"issueName">(.*?)<\//);
         if (parts !== null && parts.length === 2) {
             data.stockName = parts[1];
         }
 
         //  Get the price.
-        parts = html.match(/.LAST PRICE\<\/span\>\<div\>\<span\>(\d*\.?\d*)\</);
+        parts = html.match(/.LAST PRICE<\/span<div><span>(\d*\.?\d*)</);
         if (parts !== null && parts.length === 2) {
 
             const parsedValue = parseFloat(parts[1]);
@@ -1504,10 +1499,10 @@ class GlobeAndMail {
         }
 
         //  Get the dividend yield.
-        let parts = html.match(/.name=\"dividendYieldTrailing\".*?value=\"(\d*\.?\d*)\%/);
+        let parts = html.match(/.name=\"dividendYieldTrailing".*?value="(\d*\.?\d*)%/);
 
         if (parts === null)
-            parts = html.match(/.name=\\\"dividendYieldTrailing\\\".*?value=\\\"(\d*\.?\d*)\%/);
+            parts = html.match(/.name=\\"dividendYieldTrailing\\".*?value=\\"(\d*\.?\d*)%/);
 
         if (parts !== null && parts.length === 2) {
             const tempPct = parts[1];
@@ -1520,13 +1515,13 @@ class GlobeAndMail {
         }
 
         //  Get the name.
-        parts = html.match(/.\"symbolName\":\"(.*?)\"/);
+        parts = html.match(/."symbolName":"(.*?)"/);
         if (parts !== null && parts.length === 2) {
             data.stockName = parts[1];
         }
 
         //  Get the price.
-        parts = html.match(/.\"lastPrice\":\"(\d*\.?\d*)\"/);
+        parts = html.match(/."lastPrice":"(\d*\.?\d*)"/);
         if (parts !== null && parts.length === 2) {
 
             const parsedValue = parseFloat(parts[1]);
