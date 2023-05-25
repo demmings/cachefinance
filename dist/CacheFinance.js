@@ -410,6 +410,11 @@ class ThirdPartyFinance {
         return data;
     }
 
+    /**
+     * 
+     * @param {String} symbol 
+     * @returns {String}
+     */
     static getTickerCountryCode(symbol) {
         const colon = symbol.indexOf(":");
         let exchange = "";
@@ -446,6 +451,9 @@ class ThirdPartyFinance {
     }
 }
 
+/**
+ * @classdesc Lookup for TD website.
+ */
 class TdMarketResearch {
     /**
      * 
@@ -473,9 +481,9 @@ class TdMarketResearch {
         Logger.log(`URL = ${URL}`);
 
         //  Get the dividend yield.
-        let parts = html.match(/.Dividend Yield<\/th><td class="last">(\d*\.?\d*)%/);
+        let parts = html.match(/Dividend Yield<\/th><td class="last">(\d*\.?\d*)%/);
         if (parts === null) {
-            parts = html.match(/.Dividend Yield<\/div>.*?cell-container contains">(\d*\.?\d*)%/);
+            parts = html.match(/Dividend Yield<\/div>.*?cell-container contains">(\d*\.?\d*)%/);
         }
         if (parts !== null && parts.length === 2) {
             const tempPct = parts[1];
@@ -529,6 +537,9 @@ class TdMarketResearch {
     }
 }
 
+/**
+ * @classdesc Lookup for Yahoo site.
+ */
 class YahooFinance {
     /**
      * 
@@ -600,6 +611,9 @@ class YahooFinance {
     }
 }
 
+/**
+ * @classdesc Lookup for Globe and Mail website.
+ */
 class GlobeAndMail {
     /**
      * Only gets dividend yield.
