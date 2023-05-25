@@ -8,7 +8,7 @@ const GOOGLEFINANCE_PARAM_NOT_USED = "##NotSet##";
  * @returns {any}
  * @customfunction
  */
-function CACHEFINANCE(symbol, attribute = "price", googleFinanceValue = GOOGLEFINANCE_PARAM_NOT_USED) {
+function CACHEFINANCE(symbol, attribute = "price", googleFinanceValue = GOOGLEFINANCE_PARAM_NOT_USED) {         // skipcq: JS-0128
     Logger.log(`CACHEFINANCE:${symbol}=${attribute}. Google=${googleFinanceValue}`);
 
     if (attribute.toUpperCase() === "TEST") {

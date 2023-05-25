@@ -2,7 +2,7 @@
  * Returns a diagnostic list of 3rd party stock lookup info.
  * @returns {any[][]}
  */
-function cacheFinanceTest() {
+function cacheFinanceTest() {                               // skipcq:  JS-0128
     const tester = new CacheFinanceTest();
 
     return tester.execute();

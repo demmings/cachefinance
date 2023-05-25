@@ -8,7 +8,7 @@ const GOOGLEFINANCE_PARAM_NOT_USED = "##NotSet##";
  * @returns {any}
  * @customfunction
  */
-function CACHEFINANCE(symbol, attribute = "price", googleFinanceValue = GOOGLEFINANCE_PARAM_NOT_USED) {
+function CACHEFINANCE(symbol, attribute = "price", googleFinanceValue = GOOGLEFINANCE_PARAM_NOT_USED) {         // skipcq: JS-0128
     Logger.log(`CACHEFINANCE:${symbol}=${attribute}. Google=${googleFinanceValue}`);
 
     if (attribute.toUpperCase() === "TEST") {
@@ -1307,7 +1307,7 @@ class ThirdPartyFinance {
     static getTickerCountryCode(symbol) {
         const colon = symbol.indexOf(":");
         let exchange = "";
-        let countryCode = "";
+        let countryCode = "ca";
 
         if (colon < 0) {
             return countryCode;
@@ -1419,7 +1419,7 @@ class TdMarketResearch {
 
         const dash = symbol.indexOf("-");
         if (dash >= 0) {
-            symbol = `${symbol.substr(0, dash)}.PR.${symbol.substr(dash + 1)}`;
+            symbol = symbol.replace("-", ".PR.");
         }
 
         return symbol;
@@ -1654,7 +1654,7 @@ class StockAttributes {
  * Returns a diagnostic list of 3rd party stock lookup info.
  * @returns {any[][]}
  */
-function cacheFinanceTest() {
+function cacheFinanceTest() {                               // skipcq:  JS-0128
     const tester = new CacheFinanceTest();
 
     return tester.execute();

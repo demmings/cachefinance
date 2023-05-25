@@ -100,7 +100,7 @@ class ThirdPartyFinance {
     static getTickerCountryCode(symbol) {
         const colon = symbol.indexOf(":");
         let exchange = "";
-        let countryCode = "";
+        let countryCode = "ca";
 
         if (colon < 0) {
             return countryCode;
@@ -212,7 +212,7 @@ class TdMarketResearch {
 
         const dash = symbol.indexOf("-");
         if (dash >= 0) {
-            symbol = `${symbol.substr(0, dash)}.PR.${symbol.substr(dash + 1)}`;
+            symbol = symbol.replace("-", ".PR.");
         }
 
         return symbol;
