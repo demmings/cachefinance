@@ -1370,7 +1370,8 @@ class TdMarketResearch {
         Logger.log(`URL = ${URL}`);
 
         //  Get the dividend yield.
-        let parts = html.match(/Dividend Yield<\/th><td class="last">(\d*\.?\d*)%/);
+        
+        let parts = html.match(/Dividend Yield<\/th><td class="last">(\d{0,4}\.?\d{0,4})%/);
         if (parts === null) {
             parts = html.match(/Dividend Yield<\/div>.*?cell-container contains">(\d*\.?\d*)%/);
         }
