@@ -98,18 +98,15 @@ class ThirdPartyFinance {
      * @returns {String}
      */
     static getTickerCountryCode(symbol) {
-        const colon = symbol.indexOf(":");
         let exchange = "";
-        let countryCode = "ca";
+        let countryCode = "";
 
-        if (colon < 0) {
-            return countryCode;
+        if (symbol.indexOf(":") > 0) {
+            const parts = symbol.split(":");
+            exchange = parts[0].toUpperCase();
         }
 
-        const parts = symbol.split(":");
-        exchange = parts[0].toUpperCase();
-
-        switch(exchange) {
+        switch (exchange) {
             case "NASDAQ":
             case "NYSEARCA":
             case "NYSE":
@@ -117,7 +114,7 @@ class ThirdPartyFinance {
             case "OPRA":
             case "OTCMKTS":
                 countryCode = "us";
-                break;  
+                break;
             case "CVE":
             case "TSE":
             case "TSX":
@@ -125,8 +122,8 @@ class ThirdPartyFinance {
                 countryCode = "ca";
                 break;
             default:
-                countryCode = "us";
-                break; 
+                countryCode = "ca";     //  We the north!
+                break;
         }
 
         return countryCode;
@@ -163,7 +160,7 @@ class TdMarketResearch {
         Logger.log(`URL = ${URL}`);
 
         //  Get the dividend yield.
-        
+
         let parts = html.match(/Dividend Yield<\/th><td class="last">(\d{0,4}\.?\d{0,4})%/);
         if (parts === null) {
             parts = html.match(/Dividend Yield<\/div>.*?cell-container contains">(\d{0,4}\.?\d{0,4})%/);
@@ -239,7 +236,7 @@ class YahooFinance {
 
         let dividendPercent = html.match(/"DIVIDEND_AND_YIELD-value">\d*\.\d*\s\((\d*\.\d*)%\)/);
         if (dividendPercent === null) {
-          dividendPercent = html.match(/TD_YIELD-value">(\d*\.\d*)%/);
+            dividendPercent = html.match(/TD_YIELD-value">(\d*\.\d*)%/);
         }
 
         if (dividendPercent !== null && dividendPercent.length === 2) {
