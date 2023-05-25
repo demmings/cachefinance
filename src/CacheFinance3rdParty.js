@@ -166,7 +166,7 @@ class TdMarketResearch {
         
         let parts = html.match(/Dividend Yield<\/th><td class="last">(\d{0,4}\.?\d{0,4})%/);
         if (parts === null) {
-            parts = html.match(/Dividend Yield<\/div>.*?cell-container contains">(\d*\.?\d*)%/);
+            parts = html.match(/Dividend Yield<\/div>.*?cell-container contains">(\d{0,4}\.?\d{0,4})%/);
         }
         if (parts !== null && parts.length === 2) {
             const tempPct = parts[1];
@@ -185,8 +185,7 @@ class TdMarketResearch {
         }
 
         //  Get the price.
-        // parts = html.match(/.LAST PRICE<\/span<div><span>(\d*\.?\d*)</);
-        parts = html.match(/.LAST PRICE<\/span><div><span>(\d*\.?\d*)</);
+        parts = html.match(/.LAST PRICE<\/span><div><span>(\d{0,4}\.?\d{0,4})</);
         if (parts !== null && parts.length === 2) {
 
             const parsedValue = parseFloat(parts[1]);
@@ -319,10 +318,10 @@ class GlobeAndMail {
         }
 
         //  Get the dividend yield.
-        let parts = html.match(/.name="dividendYieldTrailing".*?value="(\d*\.?\d*)%/);
+        let parts = html.match(/.name="dividendYieldTrailing".*?value="(\d{0,4}\.?\d{0,4})%/);
 
         if (parts === null)
-            parts = html.match(/.name=\\"dividendYieldTrailing\\".*?value=\\"(\d*\.?\d*)%/);
+            parts = html.match(/.name=\\"dividendYieldTrailing\\".*?value=\\"(\d{0,4}\.?\d{0,4})%/);
 
         if (parts !== null && parts.length === 2) {
             const tempPct = parts[1];
@@ -341,7 +340,7 @@ class GlobeAndMail {
         }
 
         //  Get the price.
-        parts = html.match(/."lastPrice":"(\d*\.?\d*)"/);
+        parts = html.match(/."lastPrice":"(\d{0,4}\.?\d{0,4})"/);
         if (parts !== null && parts.length === 2) {
 
             const parsedValue = parseFloat(parts[1]);
