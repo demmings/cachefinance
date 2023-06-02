@@ -82,7 +82,7 @@ class ScriptSettings {      //  skipcq: JS-0128
                     continue;
                 }
 
-                let propertyOfThisApplication = propertyValue !== null && propertyValue.expiry !== undefined;
+                const propertyOfThisApplication = propertyValue !== null && propertyValue.expiry !== undefined;
 
                 if (propertyOfThisApplication && (PropertyData.isExpired(propertyValue) || deleteAll)) {
                     this.scriptProperties.deleteProperty(key);

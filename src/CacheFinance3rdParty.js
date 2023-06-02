@@ -12,10 +12,6 @@ class Logger {
 }
 //  *** DEBUG END ***/
 
-function testThirdParty() {
-    const result = ThirdPartyFinance.get("TSE:RY", "NAME");
-}
-
 /**
  * @classdesc Find STOCK/ETF data by scraping data from 3rd party finance websites.
  */
@@ -96,8 +92,9 @@ class FinanceWebsiteSearch {
         const lookupPlan = longCache.get(cacheKey);
 
         if (lookupPlan === null) {
-            const planWithData = this.createLookupPlan(symbol, attribute);
-            // clear out object pointer before JSON stringify is done.
+            const planWithData = this.createLookupPlan(symbol);
+
+            // Create small object with needed data for conversion to JSON.
             const searchPlan = planWithData.lookupPlan.createFinanceSiteList();
             
             longCache.put(cacheKey, searchPlan, LOOKUP_PLAN_ACTIVE_DAYS);
@@ -114,10 +111,9 @@ class FinanceWebsiteSearch {
     /**
      * 
      * @param {String} symbol 
-     * @param {String} attribute 
      * @returns {PlanPlusData}
      */
-    createLookupPlan(symbol, attribute) {
+    createLookupPlan(symbol) {
         const plans = [];
 
         for (const site of this.financeSiteList) {
@@ -190,6 +186,9 @@ class FinanceSiteList {
     }
 }
 
+/**
+ * @classdesc For analyzing finance websites.
+ */
 class FinanceSiteLookupAnalyzer {
     constructor(symbol) {
         this.symbol = symbol;

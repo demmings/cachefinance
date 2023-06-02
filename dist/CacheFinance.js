@@ -258,7 +258,7 @@ class ScriptSettings {      //  skipcq: JS-0128
                     continue;
                 }
 
-                let propertyOfThisApplication = propertyValue !== null && propertyValue.expiry !== undefined;
+                const propertyOfThisApplication = propertyValue !== null && propertyValue.expiry !== undefined;
 
                 if (propertyOfThisApplication && (PropertyData.isExpired(propertyValue) || deleteAll)) {
                     this.scriptProperties.deleteProperty(key);
@@ -314,10 +314,6 @@ class PropertyData {
         const expiryDate = new Date(obj.expiry);
         return (expiryDate.getTime() < someDate.getTime())
     }
-}
-
-function testThirdParty() {
-    const result = ThirdPartyFinance.get("TSE:RY", "NAME");
 }
 
 /**
@@ -400,8 +396,9 @@ class FinanceWebsiteSearch {
         const lookupPlan = longCache.get(cacheKey);
 
         if (lookupPlan === null) {
-            const planWithData = this.createLookupPlan(symbol, attribute);
-            // clear out object pointer before JSON stringify is done.
+            const planWithData = this.createLookupPlan(symbol);
+
+            // Create small object with needed data for conversion to JSON.
             const searchPlan = planWithData.lookupPlan.createFinanceSiteList();
             
             longCache.put(cacheKey, searchPlan, LOOKUP_PLAN_ACTIVE_DAYS);
@@ -418,10 +415,9 @@ class FinanceWebsiteSearch {
     /**
      * 
      * @param {String} symbol 
-     * @param {String} attribute 
      * @returns {PlanPlusData}
      */
-    createLookupPlan(symbol, attribute) {
+    createLookupPlan(symbol) {
         const plans = [];
 
         for (const site of this.financeSiteList) {
@@ -494,6 +490,9 @@ class FinanceSiteList {
     }
 }
 
+/**
+ * @classdesc For analyzing finance websites.
+ */
 class FinanceSiteLookupAnalyzer {
     constructor(symbol) {
         this.symbol = symbol;
