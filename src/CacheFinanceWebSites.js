@@ -4,7 +4,7 @@
 export { CacheFinanceWebSites };
 export { StockAttributes };
 export { FinanceWebSite };
-export { TdMarketResearch, GlobeAndMail, YahooFinance};
+export { TdMarketResearch, GlobeAndMail, YahooFinance };
 
 class Logger {
     static log(msg) {
@@ -55,7 +55,7 @@ class CacheFinanceWebSites {
 
         return (typeof siteInfo === 'undefined') ? null : siteInfo;
     }
-       
+
     /**
      * 
      * @param {String} symbol 
@@ -106,6 +106,20 @@ class FinanceWebSite {
     constructor(siteName, siteObject) {
         this.siteName = siteName;
         this.siteObject = siteObject;
+    }
+
+    set siteName(siteName) {
+        this._siteName = siteName;
+    }
+    get siteName() {
+        return this._siteName;
+    }
+
+    set siteObject(siteObject) {
+        this._siteObject = siteObject;
+    }
+    get siteObject() {
+        return this._siteObject;
     }
 }
 

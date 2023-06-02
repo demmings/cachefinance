@@ -1417,9 +1417,9 @@ class FinanceSiteLookupAnalyzer {
         this.nameSites = siteStats.filter(a => a.name !== null);
         this.yieldSites = siteStats.filter(a => a.yield !== null);
 
-        this.priceSites = this.priceSites.sort((a,b) => a.timeMs - b.timeMs);
-        this.nameSites = this.nameSites.sort((a,b) => a.timeMs - b.timeMs);
-        this.yieldSites = this.yieldSites.sort((a,b) => a.timeMs - b.timeMs);
+        this.priceSites.sort((a,b) => a.timeMs - b.timeMs);
+        this.nameSites.sort((a,b) => a.timeMs - b.timeMs);
+        this.yieldSites.sort((a,b) => a.timeMs - b.timeMs);
     }
 
 
@@ -1787,7 +1787,7 @@ class CacheFinanceWebSites {
 
         return (typeof siteInfo === 'undefined') ? null : siteInfo;
     }
-       
+
     /**
      * 
      * @param {String} symbol 
@@ -1838,6 +1838,20 @@ class FinanceWebSite {
     constructor(siteName, siteObject) {
         this.siteName = siteName;
         this.siteObject = siteObject;
+    }
+
+    set siteName(siteName) {
+        this._siteName = siteName;
+    }
+    get siteName() {
+        return this._siteName;
+    }
+
+    set siteObject(siteObject) {
+        this._siteObject = siteObject;
+    }
+    get siteObject() {
+        return this._siteObject;
     }
 }
 
