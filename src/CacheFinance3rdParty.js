@@ -1,3 +1,24 @@
+/*  *** DEBUG START ***
+//  Remove comments for testing in NODE
+
+import { ScriptSettings } from "./SQL/ScriptSettings.js";
+import { CacheFinanceWebSites, StockAttributes, FinanceWebSite } from "./CacheFinanceWebSites.js";
+export { ThirdPartyFinance };
+
+class Logger {
+    static log(msg) {
+        console.log(msg);
+    }
+}
+//  *** DEBUG END ***/
+
+function testThirdParty() {
+    const result = ThirdPartyFinance.get("TSE:RY", "NAME");
+}
+
+/**
+ * @classdesc Find STOCK/ETF data by scraping data from 3rd party finance websites.
+ */
 class ThirdPartyFinance {
     /**
      * 
@@ -6,25 +27,8 @@ class ThirdPartyFinance {
      * @returns {StockAttributes}
      */
     static get(symbol, attribute) {
-        let data = new StockAttributes();
-
-        switch (attribute) {
-            case "PRICE":
-                data = ThirdPartyFinance.getStockPrice(symbol);
-                break;
-
-            case "YIELDPCT":
-                data = ThirdPartyFinance.getStockDividendYield(symbol);
-                break;
-
-            case "NAME":
-                data = ThirdPartyFinance.getName(symbol);
-                break;
-
-            default:
-                Logger.log(`3'rd Party FINANCE attribute not supported: ${attribute}`);
-                break;
-        }
+        const searcher = new FinanceWebsiteSearch();
+        const data = searcher.get(symbol, attribute);
 
         if (data.stockPrice !== null)
             data.stockPrice = Math.round(data.stockPrice * 100) / 100;
@@ -34,408 +38,289 @@ class ThirdPartyFinance {
 
         return data;
     }
-
-    /**
-     * 
-     * @param {string} symbol 
-     * @returns {StockAttributes}
-     */
-    static getStockPrice(symbol) {
-        /** @type {StockAttributes} */
-        let data = GlobeAndMail.getInfo(symbol);
-
-        if (data.stockPrice === null)
-            data = TdMarketResearch.getInfo(symbol, "ETF");
-
-        if (data.stockPrice === null)
-            data = TdMarketResearch.getInfo(symbol, "STOCK");
-
-        return data;
-    }
-
-    /**
-     * 
-     * @param {String} symbol 
-     * @returns {StockAttributes}
-     */
-    static getStockDividendYield(symbol) {
-
-        let data = GlobeAndMail.getInfo(symbol);
-
-        if (data.yieldPct === null)
-            data = TdMarketResearch.getInfo(symbol, "ETF");
-
-        if (data.yieldPct === null)
-            data = TdMarketResearch.getInfo(symbol, "STOCK");
-
-        if (data.yieldPct === null)
-            data = YahooFinance.getInfo(symbol);
-
-        return data;
-    }
-
-    /**
-     * 
-     * @param {String} symbol 
-     * @returns {StockAttributes}
-     */
-    static getName(symbol) {
-        /** @type {StockAttributes} */
-        let data = GlobeAndMail.getInfo(symbol);
-
-        if (data.stockName === null)
-            data = TdMarketResearch.getInfo(symbol, "ETF");
-
-        if (data.stockName === null)
-            data = TdMarketResearch.getInfo(symbol, "STOCK");
-
-        return data;
-    }
-
-    /**
-     * 
-     * @param {String} symbol 
-     * @returns {String}
-     */
-    static getTickerCountryCode(symbol) {
-        let exchange = "";
-        let countryCode = "";
-
-        if (symbol.indexOf(":") > 0) {
-            const parts = symbol.split(":");
-            exchange = parts[0].toUpperCase();
-        }
-
-        switch (exchange) {
-            case "NASDAQ":
-            case "NYSEARCA":
-            case "NYSE":
-            case "NYSEAMERICAN":
-            case "OPRA":
-            case "OTCMKTS":
-                countryCode = "us";
-                break;
-            case "CVE":
-            case "TSE":
-            case "TSX":
-            case "TSXV":
-                countryCode = "ca";
-                break;
-            default:
-                countryCode = "ca";     //  We the north!
-                break;
-        }
-
-        return countryCode;
-    }
 }
 
 /**
- * @classdesc Lookup for TD website.
+ * @classdesc Make a plan to find finance data from websites and then execute the plan and return the data.
  */
-class TdMarketResearch {
-    /**
-     * 
-     * @param {String} symbol 
-     * @param {String} type 
-     * @returns {StockAttributes}
-     */
-    static getInfo(symbol, type = "ETF") {
-        const data = new StockAttributes();
-
-        let URL = null;
-        if (type === "ETF")
-            URL = `https://marketsandresearch.td.com/tdwca/Public/ETFsProfile/Summary/${ThirdPartyFinance.getTickerCountryCode(symbol)}/${TdMarketResearch.getTicker(symbol)}`;
-        else
-            URL = `https://marketsandresearch.td.com/tdwca/Public/Stocks/Overview/${ThirdPartyFinance.getTickerCountryCode(symbol)}/${TdMarketResearch.getTicker(symbol)}`;
-
-        let html = null;
-        try {
-            html = UrlFetchApp.fetch(URL).getContentText();
-        }
-        catch (ex) {
-            return data;
-        }
-        Logger.log(`getStockDividendYield:  ${symbol}`);
-        Logger.log(`URL = ${URL}`);
-
-        //  Get the dividend yield.
-
-        let parts = html.match(/Dividend Yield<\/th><td class="last">(\d{0,4}\.?\d{0,4})%/);
-        if (parts === null) {
-            parts = html.match(/Dividend Yield<\/div>.*?cell-container contains">(\d{0,4}\.?\d{0,4})%/);
-        }
-        if (parts !== null && parts.length === 2) {
-            const tempPct = parts[1];
-
-            const parsedValue = parseFloat(tempPct) / 100;
-
-            if (!isNaN(parsedValue)) {
-                data.yieldPct = parsedValue;
-            }
-        }
-
-        //  Get the name.
-        parts = html.match(/.<span class="issueName">(.*?)<\//);
-        if (parts !== null && parts.length === 2) {
-            data.stockName = parts[1];
-        }
-
-        //  Get the price.
-        parts = html.match(/.LAST PRICE<\/span><div><span>(\d{0,4}\.?\d{0,4})</);
-        if (parts !== null && parts.length === 2) {
-
-            const parsedValue = parseFloat(parts[1]);
-            if (!isNaN(parsedValue)) {
-                data.stockPrice = parsedValue;
-            }
-        }
-
-        return data;
-    }
-
-    /**
-     * 
-     * @param {String} symbol 
-     * @returns {String}
-     */
-    static getTicker(symbol) {
-        const colon = symbol.indexOf(":");
-
-        if (colon >= 0) {
-            const parts = symbol.split(":");
-            symbol = parts[1];
-        }
-
-        const dash = symbol.indexOf("-");
-        if (dash >= 0) {
-            symbol = symbol.replace("-", ".PR.");
-        }
-
-        return symbol;
-    }
-}
-
-/**
- * @classdesc Lookup for Yahoo site.
- */
-class YahooFinance {
-    /**
-     * 
-     * @param {String} symbol 
-     * @returns {StockAttributes}
-     */
-    static getInfo(symbol) {
-        const data = new StockAttributes();
-
-        const URL = `https://finance.yahoo.com/quote/${YahooFinance.getTicker(symbol)}`;
-
-        const html = UrlFetchApp.fetch(URL).getContentText();
-        Logger.log(`getStockDividendYield:  ${symbol}`);
-        Logger.log(`URL = ${URL}`);
-
-        let dividendPercent = html.match(/"DIVIDEND_AND_YIELD-value">\d*\.\d*\s\((\d*\.\d*)%\)/);
-        if (dividendPercent === null) {
-            dividendPercent = html.match(/TD_YIELD-value">(\d*\.\d*)%/);
-        }
-
-        if (dividendPercent !== null && dividendPercent.length === 2) {
-            const tempPct = dividendPercent[1];
-            Logger.log(`PERCENT=${tempPct}`);
-
-            data.yieldPct = parseFloat(tempPct) / 100;
-
-            if (isNaN(data.yieldPct)) {
-                data.yieldPct = null;
-            }
-        }
-
-        const baseSymbol = YahooFinance.getTicker(symbol);
-        const re = new RegExp(`data-symbol="${baseSymbol}".+?"regularMarketPrice".+?value="(\\d*\\.?\\d*)?"`);
-
-        const priceMatch = html.match(re);
-
-        if (priceMatch !== null && priceMatch.length === 2) {
-            const tempPrice = priceMatch[1];
-            Logger.log(`PRICE=${tempPrice}`);
-
-            data.stockPrice = parseFloat(tempPrice);
-
-            if (isNaN(data.stockPrice)) {
-                data.stockPrice = null;
-            }
-        }
-
-        return data;
-    }
-
-    /**
-     * 
-     * @param {String} symbol 
-     * @returns {String}
-     */
-    static getTicker(symbol) {
-        let modifiedSymbol = symbol;
-        const colon = symbol.indexOf(":");
-
-        if (colon >= 0) {
-            const symbolParts = symbol.split(":");
-
-            modifiedSymbol = symbolParts[1];
-            if (symbolParts[0] === "TSE")
-                modifiedSymbol = `${symbolParts[1]}.TO`;
-
-        }
-        return modifiedSymbol;
-    }
-}
-
-/**
- * @classdesc Lookup for Globe and Mail website.
- */
-class GlobeAndMail {
-    /**
-     * Only gets dividend yield.
-     * @param {String} symbol 
-     * @returns {StockAttributes}
-     */
-    static getInfo(symbol) {
-        const data = new StockAttributes();
-        const URL = `https://www.theglobeandmail.com/investing/markets/stocks/${GlobeAndMail.getTicker(symbol)}`;
-
-        Logger.log(`getStockDividendYield:  ${symbol}`);
-        Logger.log(`URL = ${URL}`);
-
-        let html = null;
-        try {
-            html = UrlFetchApp.fetch(URL).getContentText();
-        }
-        catch (ex) {
-            return data;
-        }
-
-        //  Get the dividend yield.
-        let parts = html.match(/.name="dividendYieldTrailing".*?value="(\d{0,4}\.?\d{0,4})%/);
-
-        if (parts === null)
-            parts = html.match(/.name=\\"dividendYieldTrailing\\".*?value=\\"(\d{0,4}\.?\d{0,4})%/);
-
-        if (parts !== null && parts.length === 2) {
-            const tempPct = parts[1];
-
-            const parsedValue = parseFloat(tempPct) / 100;
-
-            if (!isNaN(parsedValue)) {
-                data.yieldPct = parsedValue;
-            }
-        }
-
-        //  Get the name.
-        parts = html.match(/."symbolName":"(.*?)"/);
-        if (parts !== null && parts.length === 2) {
-            data.stockName = parts[1];
-        }
-
-        //  Get the price.
-        parts = html.match(/."lastPrice":"(\d{0,4}\.?\d{0,4})"/);
-        if (parts !== null && parts.length === 2) {
-
-            const parsedValue = parseFloat(parts[1]);
-            if (!isNaN(parsedValue)) {
-                data.stockPrice = parsedValue;
-            }
-        }
-
-        return data;
-    }
-
-    /**
-     * Clean up ticker symbol for use in Globe and Mail lookups.
-     * @param {String} symbol 
-     * @returns {String}
-     */
-    static getTicker(symbol) {
-        const colon = symbol.indexOf(":");
-
-        if (colon >= 0) {
-            const parts = symbol.split(":");
-
-            switch (parts[0].toUpperCase()) {
-                case "TSE":
-                    symbol = parts[1];
-                    if (parts[1].indexOf(".") !== -1) {
-                        symbol = parts[1].replace(".", "-");
-                    }
-                    else if (parts[1].indexOf("-") !== -1) {
-                        const prefShare = parts[1].split("-");
-                        symbol = `${prefShare[0]}-PR-${prefShare[1]}`;
-                    }
-                    symbol = `${symbol}-T`;
-                    break;
-                case "NYSEARCA":
-                    symbol = `${parts[1]}-A`;
-                    break;
-                case "NASDAQ":
-                    symbol = `${parts[1]}-Q`;
-                    break;
-                default:
-                    symbol = '#N/A';
-            }
-        }
-
-        return symbol;
-    }
-}
-
-/**
- * Get/Set data about stocks/ETFs.
- */
-class StockAttributes {
+class FinanceWebsiteSearch {
     constructor() {
-        this.yieldPct = null;
-        this.stockName = null;
-        this.stockPrice = null;
+        const siteInfo = new CacheFinanceWebSites();
+
+        /** @type {FinanceWebSite[]} */
+        this.financeSiteList = siteInfo.get();
     }
 
     /**
      * 
+     * @param {String} symbol 
      * @param {String} attribute 
-     * @returns {any}
+     * @returns {StockAttributes}
      */
-    getValue(attribute) {
-        switch (attribute) {
-            case "PRICE":
-                return (this.stockPrice === null) ? 0 : this.stockPrice;
-
-            case "YIELDPCT":
-                return (this.yieldPct === null) ? 0 : this.yieldPct;
-
-            case "NAME":
-                return (this.stockName === null) ? "" : this.stockName;
-
-            default:
-                return '#N/A';
+    get(symbol, attribute) {
+        const dataPlan = this.getLookupPlan(symbol, attribute);
+        if (dataPlan.lookupPlan === null) {
+            return new StockAttributes();
         }
+
+        return dataPlan.data;
     }
 
     /**
      * 
-     * @param {String} attribute 
-     * @returns {Boolean}
+     * @param {String} symbol 
+     * @returns {String}
      */
-    isAttributeSet(attribute) {
+    static makeCacheKey(symbol) {
+        return `WebSearch|${symbol}`;
+    }
+
+    /**
+     * @typedef {Object} PlanPlusData
+     * @property {FinanceSiteLookupAnalyzer} lookupPlan
+     * @property {StockAttributes} data
+     */
+
+    /**
+     * 
+     * @param {String} symbol 
+     * @param {String} attribute 
+     * @returns {PlanPlusData}
+     */
+    getLookupPlan(symbol, attribute) {
+        let data = null;
+        const LOOKUP_PLAN_ACTIVE_DAYS = 7;
+        const longCache = new ScriptSettings();
+
+        const cacheKey = FinanceWebsiteSearch.makeCacheKey(symbol);
+        const lookupPlan = longCache.get(cacheKey);
+
+        if (lookupPlan === null) {
+            const planWithData = this.createLookupPlan(symbol, attribute);
+            // clear out object pointer before JSON stringify is done.
+            const searchPlan = planWithData.lookupPlan.createFinanceSiteList();
+            
+            longCache.put(cacheKey, searchPlan, LOOKUP_PLAN_ACTIVE_DAYS);
+            return planWithData;
+        }
+        else {
+            //  Find stock attributes using optimal search plan.
+            data = FinanceSiteLookupAnalyzer.getStockAttribute(lookupPlan, attribute);
+        }
+
+        return { lookupPlan, data };
+    }
+
+    /**
+     * 
+     * @param {String} symbol 
+     * @param {String} attribute 
+     * @returns {PlanPlusData}
+     */
+    createLookupPlan(symbol, attribute) {
+        const plans = [];
+
+        for (const site of this.financeSiteList) {
+            const sitePlan = new FinanceSiteLookupStats(symbol, site);
+
+            const startTime = Date.now();
+            const data = site.siteObject.getInfo(symbol);
+
+            sitePlan.setSearchTime(Date.now() - startTime)
+                .setAttributes(data);
+
+            plans.push(sitePlan);
+        }
+
+        const lookupPlan = new FinanceSiteLookupAnalyzer(symbol);
+        lookupPlan.analyzeSiteStatus(plans);
+        const data = lookupPlan.getStockAttributes();
+
+        return { lookupPlan, data };
+    }
+
+}
+
+/**
+ * @classdesc Ordered list of sites for doing attribute lookup.
+ * This object will be converted to JSON for storage.
+ */
+class FinanceSiteList {
+    constructor(symbol) {
+        this.symbol = symbol;
+        /** @property {String[]} */
+        this.priceSites = [];
+        /** @property {String[]} */
+        this.nameSites = [];
+        /** @property {String[]} */
+        this.yieldSites = [];
+    } 
+    
+    /**
+     * 
+     * @param {String[]} arr 
+     * @returns {FinanceSiteList}
+     */
+    setPriceSites(arr) {
+        this.priceSites = [...arr];
+
+        return this;
+    }
+
+    /**
+     * 
+     * @param {String[]} arr 
+     * @returns {FinanceSiteList}
+     */
+    setNameSites(arr) {
+        this.nameSites = [...arr];
+
+        return this;
+    }
+
+    /**
+     * 
+     * @param {String[]} arr 
+     * @returns {FinanceSiteList}
+     */
+    setYieldSites(arr) {
+        this.yieldSites = [...arr];
+
+        return this;
+    }
+}
+
+class FinanceSiteLookupAnalyzer {
+    constructor(symbol) {
+        this.symbol = symbol;
+        /** @property {FinanceSiteLookupStats[]} */
+        this.priceSites = [];
+        /** @property {FinanceSiteLookupStats[]} */
+        this.nameSites = [];
+        /** @property {FinanceSiteLookupStats[]} */
+        this.yieldSites = [];
+    }
+
+    /**
+     * 
+     * @returns {FinanceSiteList}
+     */
+    createFinanceSiteList() {
+        const orderedFinances = new FinanceSiteList(this.symbol);
+
+        orderedFinances.setPriceSites(this.priceSites.map(a => a.siteObject.siteName))
+            .setNameSites(this.nameSites.map(a => a.siteObject.siteName))
+            .setYieldSites(this.yieldSites.map(a => a.siteObject.siteName));
+
+        return orderedFinances;
+    }
+
+    /**
+     * 
+     * @param {FinanceSiteLookupStats[]} siteStats 
+     */
+    analyzeSiteStatus(siteStats) {
+        this.priceSites = siteStats.filter(a => a.price !== null);
+        this.nameSites = siteStats.filter(a => a.name !== null);
+        this.yieldSites = siteStats.filter(a => a.yield !== null);
+
+        this.priceSites = this.priceSites.sort((a,b) => a.timeMs - b.timeMs);
+        this.nameSites = this.nameSites.sort((a,b) => a.timeMs - b.timeMs);
+        this.yieldSites = this.yieldSites.sort((a,b) => a.timeMs - b.timeMs);
+    }
+
+
+    /**
+     * Returns most recent stock attributes found when analyzing sites.
+     * @returns 
+     */
+    getStockAttributes() {
+        const attributes = new StockAttributes();
+
+        attributes.stockPrice = this.priceSites.length > 0 ? this.priceSites[0].price : null;
+        attributes.stockName = this.nameSites.length > 0 ? this.nameSites[0].name : null;
+        attributes.yieldPct = this.yieldSites.length > 0 ? this.yieldSites[0].yield : null;
+
+        return attributes;
+    }
+
+
+    /**
+     * 
+     * @param {FinanceSiteList} stockSites 
+     * @param {String} attribute 
+     * @returns 
+     */
+    static getStockAttribute(stockSites, attribute) {
+        let data = new StockAttributes();
+        let siteArr = [];
+
         switch (attribute) {
             case "PRICE":
-                return this.stockPrice !== null;
+                siteArr = stockSites.priceSites;
+                break;
 
             case "YIELDPCT":
-                return this.yieldPct !== null;
+                siteArr = stockSites.yieldSites;
+                break;
 
             case "NAME":
-                return this.stockName !== null;
+                siteArr = stockSites.nameSites;
+                break;
 
             default:
-                return false;
+                siteArr = stockSites.priceSites;
+                break;
         }
+
+        const sitesSearchFunction = new CacheFinanceWebSites();
+        for (const site of siteArr) {
+            const siteFunction = sitesSearchFunction.getByName(site);
+            data = siteFunction.getInfo(stockSites.symbol);
+
+            if (data !== null) {
+                return data;
+            }
+        }  
+        
+        return data;
+    }
+}
+
+/**
+ * @classdesc Used to track lookup times for a stock symbol.
+ */
+class FinanceSiteLookupStats {
+    /**
+     * 
+     * @param {String} symbol 
+     * @param {FinanceWebSite} siteObject
+     */
+    constructor(symbol, siteObject) {
+        this.symbol = symbol;
+        this.siteObject = siteObject;
+    }
+
+    /**
+     * 
+     * @param {Number} timeMs 
+     * @returns {FinanceSiteLookupStats}
+     */
+    setSearchTime(timeMs) {
+        this.timeMs = timeMs;
+        return this;
+    }
+
+    /**
+     * 
+     * @param {StockAttributes} stockAttributes 
+     * @returns {FinanceSiteLookupStats}
+     */
+    setAttributes(stockAttributes) {
+        this.price = stockAttributes.stockPrice;
+        this.name = stockAttributes.stockName;
+        this.yield = stockAttributes.yieldPct;
+
+        return this;
     }
 }

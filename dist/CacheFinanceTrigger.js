@@ -1,3 +1,4 @@
+
 const GOOGLEFINANCE_PARAM_NOT_USED = "##NotSet##";
 
 /**
@@ -159,8 +160,9 @@ class CacheFinance {
             return;
         }
 
-        if (currentShortCacheValue !== null)
+        if (currentShortCacheValue !== null) {
             Logger.log(`Short Cache Changed.  Old=${JSON.parse(currentShortCacheValue)} . New=${financialData}`);
+        }
    
         //  If we normally get the price from Google, we want to cache for a longer
         //  time because the only time we need a price for this particular stock
@@ -177,11 +179,6 @@ class CacheFinance {
         Logger.log(`SET GoogleFinance VALUE Long/Short Cache. Key=${key}.  Value=${financialData}. Short ms=${shortMs}. Long ms=${longMs}`);
     }
 }
-
-
-
-
-
 
 //  Named range in sheet with CacheFinance configurations.
 const CACHE_LEGEND = "CACHEFINANCE";
@@ -236,7 +233,7 @@ function CacheFinanceBoot() {                       //  skipcq: JS-0128
 }
 
 /**
- * Manage TRIGGERS that run and update stock/etf data from the web.
+ * @classdesc Manage TRIGGERS that run and update stock/etf data from the web.
  */
 class CacheJobSettings {
     constructor() {
@@ -1148,9 +1145,12 @@ class ScriptSettings {      //  skipcq: JS-0128
                 }
                 catch (e) {
                     Logger.log(`Script property data is not JSON. key=${key}`);
+                    continue;
                 }
 
-                if (propertyValue !== null && (PropertyData.isExpired(propertyValue) || deleteAll)) {
+                let propertyOfThisApplication = propertyValue !== null && propertyValue.expiry !== undefined;
+
+                if (propertyOfThisApplication && (PropertyData.isExpired(propertyValue) || deleteAll)) {
                     this.scriptProperties.deleteProperty(key);
                     Logger.log(`Removing expired SCRIPT PROPERTY: key=${key}`);
                 }
@@ -1205,6 +1205,14 @@ class PropertyData {
         return (expiryDate.getTime() < someDate.getTime())
     }
 }
+
+function testThirdParty() {
+    const result = ThirdPartyFinance.get("TSE:RY", "NAME");
+}
+
+/**
+ * @classdesc Find STOCK/ETF data by scraping data from 3rd party finance websites.
+ */
 class ThirdPartyFinance {
     /**
      * 
@@ -1213,25 +1221,8 @@ class ThirdPartyFinance {
      * @returns {StockAttributes}
      */
     static get(symbol, attribute) {
-        let data = new StockAttributes();
-
-        switch (attribute) {
-            case "PRICE":
-                data = ThirdPartyFinance.getStockPrice(symbol);
-                break;
-
-            case "YIELDPCT":
-                data = ThirdPartyFinance.getStockDividendYield(symbol);
-                break;
-
-            case "NAME":
-                data = ThirdPartyFinance.getName(symbol);
-                break;
-
-            default:
-                Logger.log(`3'rd Party FINANCE attribute not supported: ${attribute}`);
-                break;
-        }
+        const searcher = new FinanceWebsiteSearch();
+        const data = searcher.get(symbol, attribute);
 
         if (data.stockPrice !== null)
             data.stockPrice = Math.round(data.stockPrice * 100) / 100;
@@ -1241,64 +1232,563 @@ class ThirdPartyFinance {
 
         return data;
     }
+}
 
-    /**
-     * 
-     * @param {string} symbol 
-     * @returns {StockAttributes}
-     */
-    static getStockPrice(symbol) {
-        /** @type {StockAttributes} */
-        let data = GlobeAndMail.getInfo(symbol);
+/**
+ * @classdesc Make a plan to find finance data from websites and then execute the plan and return the data.
+ */
+class FinanceWebsiteSearch {
+    constructor() {
+        const siteInfo = new CacheFinanceWebSites();
 
-        if (data.stockPrice === null)
-            data = TdMarketResearch.getInfo(symbol, "ETF");
-
-        if (data.stockPrice === null)
-            data = TdMarketResearch.getInfo(symbol, "STOCK");
-
-        return data;
+        /** @type {FinanceWebSite[]} */
+        this.financeSiteList = siteInfo.get();
     }
 
     /**
      * 
      * @param {String} symbol 
+     * @param {String} attribute 
      * @returns {StockAttributes}
      */
-    static getStockDividendYield(symbol) {
+    get(symbol, attribute) {
+        const dataPlan = this.getLookupPlan(symbol, attribute);
+        if (dataPlan.lookupPlan === null) {
+            return new StockAttributes();
+        }
 
-        let data = GlobeAndMail.getInfo(symbol);
-
-        if (data.yieldPct === null)
-            data = TdMarketResearch.getInfo(symbol, "ETF");
-
-        if (data.yieldPct === null)
-            data = TdMarketResearch.getInfo(symbol, "STOCK");
-
-        if (data.yieldPct === null)
-            data = YahooFinance.getInfo(symbol);
-
-        return data;
+        return dataPlan.data;
     }
 
     /**
      * 
      * @param {String} symbol 
-     * @returns {StockAttributes}
+     * @returns {String}
      */
-    static getName(symbol) {
-        /** @type {StockAttributes} */
-        let data = GlobeAndMail.getInfo(symbol);
-
-        if (data.stockName === null)
-            data = TdMarketResearch.getInfo(symbol, "ETF");
-
-        if (data.stockName === null)
-            data = TdMarketResearch.getInfo(symbol, "STOCK");
-
-        return data;
+    static makeCacheKey(symbol) {
+        return `WebSearch|${symbol}`;
     }
 
+    /**
+     * @typedef {Object} PlanPlusData
+     * @property {FinanceSiteLookupAnalyzer} lookupPlan
+     * @property {StockAttributes} data
+     */
+
+    /**
+     * 
+     * @param {String} symbol 
+     * @param {String} attribute 
+     * @returns {PlanPlusData}
+     */
+    getLookupPlan(symbol, attribute) {
+        let data = null;
+        const LOOKUP_PLAN_ACTIVE_DAYS = 7;
+        const longCache = new ScriptSettings();
+
+        const cacheKey = FinanceWebsiteSearch.makeCacheKey(symbol);
+        const lookupPlan = longCache.get(cacheKey);
+
+        if (lookupPlan === null) {
+            const planWithData = this.createLookupPlan(symbol, attribute);
+            // clear out object pointer before JSON stringify is done.
+            const searchPlan = planWithData.lookupPlan.createFinanceSiteList();
+            
+            longCache.put(cacheKey, searchPlan, LOOKUP_PLAN_ACTIVE_DAYS);
+            return planWithData;
+        }
+        else {
+            //  Find stock attributes using optimal search plan.
+            data = FinanceSiteLookupAnalyzer.getStockAttribute(lookupPlan, attribute);
+        }
+
+        return { lookupPlan, data };
+    }
+
+    /**
+     * 
+     * @param {String} symbol 
+     * @param {String} attribute 
+     * @returns {PlanPlusData}
+     */
+    createLookupPlan(symbol, attribute) {
+        const plans = [];
+
+        for (const site of this.financeSiteList) {
+            const sitePlan = new FinanceSiteLookupStats(symbol, site);
+
+            const startTime = Date.now();
+            const data = site.siteObject.getInfo(symbol);
+
+            sitePlan.setSearchTime(Date.now() - startTime)
+                .setAttributes(data);
+
+            plans.push(sitePlan);
+        }
+
+        const lookupPlan = new FinanceSiteLookupAnalyzer(symbol);
+        lookupPlan.analyzeSiteStatus(plans);
+        const data = lookupPlan.getStockAttributes();
+
+        return { lookupPlan, data };
+    }
+
+}
+
+/**
+ * @classdesc Ordered list of sites for doing attribute lookup.
+ * This object will be converted to JSON for storage.
+ */
+class FinanceSiteList {
+    constructor(symbol) {
+        this.symbol = symbol;
+        /** @property {String[]} */
+        this.priceSites = [];
+        /** @property {String[]} */
+        this.nameSites = [];
+        /** @property {String[]} */
+        this.yieldSites = [];
+    } 
+    
+    /**
+     * 
+     * @param {String[]} arr 
+     * @returns {FinanceSiteList}
+     */
+    setPriceSites(arr) {
+        this.priceSites = [...arr];
+
+        return this;
+    }
+
+    /**
+     * 
+     * @param {String[]} arr 
+     * @returns {FinanceSiteList}
+     */
+    setNameSites(arr) {
+        this.nameSites = [...arr];
+
+        return this;
+    }
+
+    /**
+     * 
+     * @param {String[]} arr 
+     * @returns {FinanceSiteList}
+     */
+    setYieldSites(arr) {
+        this.yieldSites = [...arr];
+
+        return this;
+    }
+}
+
+class FinanceSiteLookupAnalyzer {
+    constructor(symbol) {
+        this.symbol = symbol;
+        /** @property {FinanceSiteLookupStats[]} */
+        this.priceSites = [];
+        /** @property {FinanceSiteLookupStats[]} */
+        this.nameSites = [];
+        /** @property {FinanceSiteLookupStats[]} */
+        this.yieldSites = [];
+    }
+
+    /**
+     * 
+     * @returns {FinanceSiteList}
+     */
+    createFinanceSiteList() {
+        const orderedFinances = new FinanceSiteList(this.symbol);
+
+        orderedFinances.setPriceSites(this.priceSites.map(a => a.siteObject.siteName))
+            .setNameSites(this.nameSites.map(a => a.siteObject.siteName))
+            .setYieldSites(this.yieldSites.map(a => a.siteObject.siteName));
+
+        return orderedFinances;
+    }
+
+    /**
+     * 
+     * @param {FinanceSiteLookupStats[]} siteStats 
+     */
+    analyzeSiteStatus(siteStats) {
+        this.priceSites = siteStats.filter(a => a.price !== null);
+        this.nameSites = siteStats.filter(a => a.name !== null);
+        this.yieldSites = siteStats.filter(a => a.yield !== null);
+
+        this.priceSites = this.priceSites.sort((a,b) => a.timeMs - b.timeMs);
+        this.nameSites = this.nameSites.sort((a,b) => a.timeMs - b.timeMs);
+        this.yieldSites = this.yieldSites.sort((a,b) => a.timeMs - b.timeMs);
+    }
+
+
+    /**
+     * Returns most recent stock attributes found when analyzing sites.
+     * @returns 
+     */
+    getStockAttributes() {
+        const attributes = new StockAttributes();
+
+        attributes.stockPrice = this.priceSites.length > 0 ? this.priceSites[0].price : null;
+        attributes.stockName = this.nameSites.length > 0 ? this.nameSites[0].name : null;
+        attributes.yieldPct = this.yieldSites.length > 0 ? this.yieldSites[0].yield : null;
+
+        return attributes;
+    }
+
+
+    /**
+     * 
+     * @param {FinanceSiteList} stockSites 
+     * @param {String} attribute 
+     * @returns 
+     */
+    static getStockAttribute(stockSites, attribute) {
+        let data = new StockAttributes();
+        let siteArr = [];
+
+        switch (attribute) {
+            case "PRICE":
+                siteArr = stockSites.priceSites;
+                break;
+
+            case "YIELDPCT":
+                siteArr = stockSites.yieldSites;
+                break;
+
+            case "NAME":
+                siteArr = stockSites.nameSites;
+                break;
+
+            default:
+                siteArr = stockSites.priceSites;
+                break;
+        }
+
+        const sitesSearchFunction = new CacheFinanceWebSites();
+        for (const site of siteArr) {
+            const siteFunction = sitesSearchFunction.getByName(site);
+            data = siteFunction.getInfo(stockSites.symbol);
+
+            if (data !== null) {
+                return data;
+            }
+        }  
+        
+        return data;
+    }
+}
+
+/**
+ * @classdesc Used to track lookup times for a stock symbol.
+ */
+class FinanceSiteLookupStats {
+    /**
+     * 
+     * @param {String} symbol 
+     * @param {FinanceWebSite} siteObject
+     */
+    constructor(symbol, siteObject) {
+        this.symbol = symbol;
+        this.siteObject = siteObject;
+    }
+
+    /**
+     * 
+     * @param {Number} timeMs 
+     * @returns {FinanceSiteLookupStats}
+     */
+    setSearchTime(timeMs) {
+        this.timeMs = timeMs;
+        return this;
+    }
+
+    /**
+     * 
+     * @param {StockAttributes} stockAttributes 
+     * @returns {FinanceSiteLookupStats}
+     */
+    setAttributes(stockAttributes) {
+        this.price = stockAttributes.stockPrice;
+        this.name = stockAttributes.stockName;
+        this.yield = stockAttributes.yieldPct;
+
+        return this;
+    }
+}
+
+/**
+ * Returns a diagnostic list of 3rd party stock lookup info.
+ * @returns {any[][]}
+ */
+function cacheFinanceTest() {                               // skipcq:  JS-0128
+    const tester = new CacheFinanceTest();
+
+    return tester.execute();
+}
+
+/**
+ * @classdesc executes 3rd party data lookup tests.
+ */
+class CacheFinanceTest {
+    constructor() {
+        // const ss = new ScriptSettings();
+        // ss.expire(true);
+
+        this.cacheTestRun = new CacheFinanceTestRun();
+    }
+
+    /**
+     * Run the tests.
+     * @returns {any[][]}
+     */
+    execute() {
+        this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "NYSEARCA:SHYG");
+        this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "TSE:MEG");
+        this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "TSE:RY");
+        this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "NASDAQ:MSFT");
+        
+        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "NYSEARCA:SHYG");
+        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:ZTL");
+        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:DFN-A");
+        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "ZTL", "STOCK");
+        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:DFN-A", "STOCK");
+        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "NASDAQ:MSFT", "STOCK");
+        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:RY", "STOCK");
+
+        this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "NYSEARCA:SHYG");
+        this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:FTN-A");
+        this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:HBF.B");
+        this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:MEG");
+        this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:ZTL");
+        this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:RY");
+        this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "NASDAQ:MSFT");
+
+        this.cacheTestRun.run("OptimalSite", ThirdPartyFinance.get, "TSE:RY", "PRICE");
+        this.cacheTestRun.run("OptimalSite", ThirdPartyFinance.get, "NASDAQ:BNDX", "PRICE");
+
+        return this.cacheTestRun.getTestRunResults();
+    }
+}
+
+/**
+ * @classdesc track test results for 3rd party site tests.
+ */
+class CacheFinanceTestRun {
+    constructor() {
+        /** @type {CacheFinanceTestStatus[]} */
+        this.testRuns = [];
+    }
+
+    /**
+     * Run one test.
+     * @param {String} serviceName 
+     * @param {*} func 
+     * @param {String} symbol 
+     */
+    run(serviceName, func, symbol, type = "ETF") {
+        const result = new CacheFinanceTestStatus(serviceName, symbol);
+        try {
+            /** @type {StockAttributes} */
+            const data = func(symbol, type);
+            result.setStatus("ok");
+            result.setStockAttributes(data);
+            result.setTypeLookup(type);
+
+            if (data.stockName === null && data.stockPrice === null && data.yieldPct === null) {
+                result.setStatus("Not Found!")
+            }
+        }
+        catch(ex) {
+            result.setStatus("Error");
+        }
+        result.finishTimer();
+
+        this.testRuns.push(result);
+    } 
+    
+    /**
+     * Return results for all tests.
+     * @returns {any[][]}
+     */
+    getTestRunResults() {
+        const resultTable = [];
+
+        /** @type {any[]} */
+        let row = ["Service", "Symbol", "Status", "Price", "Yield", "Name", "Type", "Run Time(ms)"];
+        resultTable.push(row);
+
+        for (const testRun of this.testRuns) {
+            row = [];
+
+            row.push(testRun.serviceName);
+            row.push(testRun.symbol);
+            row.push(testRun.status);
+            row.push(testRun.stockAttributes.stockPrice);
+            row.push(testRun.stockAttributes.yieldPct);
+            row.push(testRun.stockAttributes.stockName);
+            row.push(testRun.typeLookup);
+            row.push(testRun.runTime);
+
+            resultTable.push(row);
+        }
+
+        return resultTable;
+    }
+}
+
+/**
+ * @classdesc Individual test results and tracking.
+ */
+class CacheFinanceTestStatus {
+    constructor (serviceName="", symbol="") {
+        this._serviceName = serviceName;
+        this._symbol = symbol;
+        this._stockAttributes = new StockAttributes();
+        this._startTime = Date.now()
+        this._typeLookup = "";
+        this._runTime = 0;
+    }
+
+    get serviceName() {
+        return this._serviceName;
+    }
+    get symbol () {
+        return this._symbol;
+    }
+    get value() {
+        return this._value;
+    }
+    get status() {
+        return this._status;
+    }
+    get runTime() {
+        return this._runTime;
+    }
+    get stockAttributes() {
+        return this._stockAttributes;
+    }
+    get typeLookup() {
+        return this._typeLookup;
+    }
+
+    /**
+     * 
+     * @param {String} val 
+     * @returns {CacheFinanceTestStatus}
+     */
+    setServiceName(val) {
+        this._serviceName = val;
+        return this;
+    }
+
+    /**
+     * 
+     * @param {String} val 
+     * @returns {CacheFinanceTestStatus}
+     */
+    setSymbol(val) {
+        this._symbol = val;
+        return this;
+    }
+
+    /**
+     * 
+     * @param {any} val 
+     * @returns {CacheFinanceTestStatus}
+     */
+    setValue(val) {
+        this._value = val;
+        return this;
+    }
+
+    /**
+     * 
+     * @param {String} val 
+     * @returns {CacheFinanceTestStatus}
+     */
+    setStatus(val) {
+        this._status = val;
+        return this;
+    }
+
+    /**
+     * 
+     * @param {String} val 
+     * @returns {CacheFinanceTestStatus}
+     */
+    setTypeLookup(val) {
+        this._typeLookup = val;
+        return this;
+    }
+
+    /**
+     * 
+     * @param {StockAttributes} val 
+     * @returns {CacheFinanceTestStatus}
+     */
+    setStockAttributes(val) {
+        this._stockAttributes = val;
+        return this;
+    }
+
+    /**
+     * 
+     * @returns {CacheFinanceTestStatus}
+     */
+    finishTimer() {
+        this._runTime = Date.now() - this._startTime;
+        return this;
+    }
+}
+
+
+
+/**
+ * @classdesc Finance Website Info.
+ */
+class CacheFinanceWebSites {
+    /**
+     * All finance website lookup objects should be defined here.
+     * All finance Website Objects must implement the method "getInfo(symbol)"
+     * The getInfo() method must return an instance of "StockAttributes"
+     */
+    constructor() {
+        this.siteList = [
+            new FinanceWebSite("TDEtf", TdMarketsEtf),
+            new FinanceWebSite("TDStock", TdMarketsStock),
+            new FinanceWebSite("Yahoo", YahooFinance),
+            new FinanceWebSite("Globe", GlobeAndMail)
+        ];
+
+        /** @property {Map<String, FinanceWebSite>} */
+        this.siteMap = new Map();
+        for (const site of this.siteList) {
+            this.siteMap.set(site.siteName, site.siteObject);
+        }
+    }
+
+    /**
+     * 
+     * @returns {FinanceWebSite[]}
+     */
+    get() {
+        return this.siteList;
+    }
+
+    /**
+     * Get info for running function to get info about a stock using a specfic service name
+     * @param {String} name - Name of search to find object containing class info to make function call.
+     * @returns {FinanceWebSite}
+     */
+    getByName(name) {
+        const siteInfo = this.siteMap.get(name);
+
+        return (typeof siteInfo === 'undefined') ? null : siteInfo;
+    }
+       
     /**
      * 
      * @param {String} symbol 
@@ -1338,7 +1828,50 @@ class ThirdPartyFinance {
 }
 
 /**
- * @classdesc Lookup for TD website.
+ * @classdesc - defines an instance of an object to perform getInfo(symbol)
+ */
+class FinanceWebSite {
+    /**
+     * 
+     * @param {String} siteName 
+     * @param {object} siteObject - Points to class for getting finance data.
+     */
+    constructor(siteName, siteObject) {
+        this.siteName = siteName;
+        this.siteObject = siteObject;
+    }
+}
+
+/**
+ * @classdesc TD Markets lookup by ETF symbol
+ */
+class TdMarketsEtf {
+    /**
+     * 
+     * @param {String} symbol 
+     * @returns {StockAttributes}
+     */
+    static getInfo(symbol) {
+        return TdMarketResearch.getInfo(symbol, "ETF");
+    }
+}
+
+/**
+ * @classdesc TD Markets lookup by STOCK symbol
+ */
+class TdMarketsStock {
+    /**
+     * 
+     * @param {String} symbol 
+     * @returns {StockAttributes}
+     */
+    static getInfo(symbol) {
+        return TdMarketResearch.getInfo(symbol, "STOCK");
+    }
+}
+
+/**
+ * @classdesc Base class to Lookup for TD website.
  */
 class TdMarketResearch {
     /**
@@ -1352,9 +1885,9 @@ class TdMarketResearch {
 
         let URL = null;
         if (type === "ETF")
-            URL = `https://marketsandresearch.td.com/tdwca/Public/ETFsProfile/Summary/${ThirdPartyFinance.getTickerCountryCode(symbol)}/${TdMarketResearch.getTicker(symbol)}`;
+            URL = `https://marketsandresearch.td.com/tdwca/Public/ETFsProfile/Summary/${CacheFinanceWebSites.getTickerCountryCode(symbol)}/${TdMarketResearch.getTicker(symbol)}`;
         else
-            URL = `https://marketsandresearch.td.com/tdwca/Public/Stocks/Overview/${ThirdPartyFinance.getTickerCountryCode(symbol)}/${TdMarketResearch.getTicker(symbol)}`;
+            URL = `https://marketsandresearch.td.com/tdwca/Public/Stocks/Overview/${CacheFinanceWebSites.getTickerCountryCode(symbol)}/${TdMarketResearch.getTicker(symbol)}`;
 
         let html = null;
         try {
@@ -1646,227 +2179,5 @@ class StockAttributes {
         }
     }
 }
-
-/**
- * Returns a diagnostic list of 3rd party stock lookup info.
- * @returns {any[][]}
- */
-function cacheFinanceTest() {                               // skipcq:  JS-0128
-    const tester = new CacheFinanceTest();
-
-    return tester.execute();
-}
-
-/**
- * @classdesc executes 3rd party data lookup tests.
- */
-class CacheFinanceTest {
-    constructor() {
-        this.cacheTestRun = new CacheFinanceTestRun();
-    }
-
-    /**
-     * Run the tests.
-     * @returns {any[][]}
-     */
-    execute() {
-        this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "NYSEARCA:SHYG");
-        this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "badSymbol");
-        this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "ZTL");
-        this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "TSE:MEG");
-        this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "NASDAQ:MSFT");
-        
-        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "NYSEARCA:SHYG");
-        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "ZTL");
-        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:ZTL");
-        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:DFN-A");
-        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "ZTL", "STOCK");
-        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:DFN-A", "STOCK");
-        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "NASDAQ:MSFT", "STOCK");
-        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "badSymbol");
-
-        this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "NYSEARCA:SHYG");
-        this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:FTN-A");
-        this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:HBF.B");
-        this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:MEG");
-        this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:ZTL");
-        this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "NASDAQ:MSFT");
-        this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "badSymbol");
-
-        return this.cacheTestRun.getTestRunResults();
-    }
-}
-
-/**
- * @classdesc track test results for 3rd party site tests.
- */
-class CacheFinanceTestRun {
-    constructor() {
-        /** @type {CacheFinanceTestStatus[]} */
-        this.testRuns = [];
-    }
-
-    /**
-     * Run one test.
-     * @param {String} serviceName 
-     * @param {*} func 
-     * @param {String} symbol 
-     */
-    run(serviceName, func, symbol, type = "ETF") {
-        const result = new CacheFinanceTestStatus(serviceName, symbol);
-        try {
-            /** @type {StockAttributes} */
-            const data = func(symbol, type);
-            result.setStatus("ok");
-            result.setStockAttributes(data);
-            result.setTypeLookup(type);
-
-            if (data.stockName === null && data.stockPrice === null && data.yieldPct === null) {
-                result.setStatus("Not Found!")
-            }
-        }
-        catch(ex) {
-            result.setStatus("Error");
-        }
-        result.finishTimer();
-
-        this.testRuns.push(result);
-    } 
-    
-    /**
-     * Return results for all tests.
-     * @returns {any[][]}
-     */
-    getTestRunResults() {
-        const resultTable = [];
-
-        /** @type {any[]} */
-        let row = ["Service", "Symbol", "Status", "Price", "Yield", "Name", "Type", "Run Time(ms)"];
-        resultTable.push(row);
-
-        for (const testRun of this.testRuns) {
-            row = [];
-
-            row.push(testRun.serviceName);
-            row.push(testRun.symbol);
-            row.push(testRun.status);
-            row.push(testRun.stockAttributes.stockPrice);
-            row.push(testRun.stockAttributes.yieldPct);
-            row.push(testRun.stockAttributes.stockName);
-            row.push(testRun.typeLookup);
-            row.push(testRun.runTime);
-
-            resultTable.push(row);
-        }
-
-        return resultTable;
-    }
-}
-
-/**
- * Individual test results and tracking.
- */
-class CacheFinanceTestStatus {
-    constructor (serviceName="", symbol="") {
-        this._serviceName = serviceName;
-        this._symbol = symbol;
-        this._stockAttributes = new StockAttributes();
-        this._startTime = Date.now()
-        this._typeLookup = "";
-        this._runTime = 0;
-    }
-
-    get serviceName() {
-        return this._serviceName;
-    }
-    get symbol () {
-        return this._symbol;
-    }
-    get value() {
-        return this._value;
-    }
-    get status() {
-        return this._status;
-    }
-    get runTime() {
-        return this._runTime;
-    }
-    get stockAttributes() {
-        return this._stockAttributes;
-    }
-    get typeLookup() {
-        return this._typeLookup;
-    }
-
-    /**
-     * 
-     * @param {String} val 
-     * @returns {CacheFinanceTestStatus}
-     */
-    setServiceName(val) {
-        this._serviceName = val;
-        return this;
-    }
-
-    /**
-     * 
-     * @param {String} val 
-     * @returns {CacheFinanceTestStatus}
-     */
-    setSymbol(val) {
-        this._symbol = val;
-        return this;
-    }
-
-    /**
-     * 
-     * @param {any} val 
-     * @returns {CacheFinanceTestStatus}
-     */
-    setValue(val) {
-        this._value = val;
-        return this;
-    }
-
-    /**
-     * 
-     * @param {String} val 
-     * @returns {CacheFinanceTestStatus}
-     */
-    setStatus(val) {
-        this._status = val;
-        return this;
-    }
-
-    /**
-     * 
-     * @param {String} val 
-     * @returns {CacheFinanceTestStatus}
-     */
-    setTypeLookup(val) {
-        this._typeLookup = val;
-        return this;
-    }
-
-    /**
-     * 
-     * @param {StockAttributes} val 
-     * @returns {CacheFinanceTestStatus}
-     */
-    setStockAttributes(val) {
-        this._stockAttributes = val;
-        return this;
-    }
-
-    /**
-     * 
-     * @returns {CacheFinanceTestStatus}
-     */
-    finishTimer() {
-        this._runTime = Date.now() - this._startTime;
-        return this;
-    }
-}
-
 
 

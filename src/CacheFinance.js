@@ -1,3 +1,19 @@
+/*  *** DEBUG START ***
+//  Remove comments for testing in NODE
+
+import { ScriptSettings } from "./SQL/ScriptSettings.js";
+import { ThirdPartyFinance } from "./CacheFinance3rdParty.js";
+import { cacheFinanceTest } from "./CacheFinanceTest.js";
+import { StockAttributes } from "./CacheFinanceWebSites.js";
+export { CACHEFINANCE };
+
+class Logger {
+    static log(msg) {
+        console.log(msg);
+    }
+}
+//  *** DEBUG END ***/
+
 const GOOGLEFINANCE_PARAM_NOT_USED = "##NotSet##";
 
 /**
@@ -159,8 +175,9 @@ class CacheFinance {
             return;
         }
 
-        if (currentShortCacheValue !== null)
+        if (currentShortCacheValue !== null) {
             Logger.log(`Short Cache Changed.  Old=${JSON.parse(currentShortCacheValue)} . New=${financialData}`);
+        }
    
         //  If we normally get the price from Google, we want to cache for a longer
         //  time because the only time we need a price for this particular stock
@@ -177,8 +194,3 @@ class CacheFinance {
         Logger.log(`SET GoogleFinance VALUE Long/Short Cache. Key=${key}.  Value=${financialData}. Short ms=${shortMs}. Long ms=${longMs}`);
     }
 }
-
-
-
-
-

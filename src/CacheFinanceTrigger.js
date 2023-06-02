@@ -1,3 +1,15 @@
+/*  *** DEBUG START ***
+//  Remove comments for testing in NODE
+
+import { CACHEFINANCE } from "./CacheFinance";
+
+class Logger {
+    static log(msg) {
+        console.log(msg);
+    }
+}
+//  *** DEBUG END ***/
+
 //  Named range in sheet with CacheFinance configurations.
 const CACHE_LEGEND = "CACHEFINANCE";
 
@@ -51,7 +63,7 @@ function CacheFinanceBoot() {                       //  skipcq: JS-0128
 }
 
 /**
- * Manage TRIGGERS that run and update stock/etf data from the web.
+ * @classdesc Manage TRIGGERS that run and update stock/etf data from the web.
  */
 class CacheJobSettings {
     constructor() {

@@ -79,9 +79,12 @@ class ScriptSettings {      //  skipcq: JS-0128
                 }
                 catch (e) {
                     Logger.log(`Script property data is not JSON. key=${key}`);
+                    continue;
                 }
 
-                if (propertyValue !== null && (PropertyData.isExpired(propertyValue) || deleteAll)) {
+                let propertyOfThisApplication = propertyValue !== null && propertyValue.expiry !== undefined;
+
+                if (propertyOfThisApplication && (PropertyData.isExpired(propertyValue) || deleteAll)) {
                     this.scriptProperties.deleteProperty(key);
                     Logger.log(`Removing expired SCRIPT PROPERTY: key=${key}`);
                 }

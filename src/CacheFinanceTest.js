@@ -1,3 +1,18 @@
+/*  *** DEBUG START ***
+//  Remove comments for testing in NODE
+
+import { StockAttributes } from "./CacheFinanceWebSites.js";
+import { TdMarketResearch, GlobeAndMail, YahooFinance} from "./CacheFinanceWebSites.js";
+import { ThirdPartyFinance } from "./CacheFinance3rdParty.js";
+export { cacheFinanceTest };
+
+class Logger {
+    static log(msg) {
+        console.log(msg);
+    }
+}
+//  *** DEBUG END ***/
+
 /**
  * Returns a diagnostic list of 3rd party stock lookup info.
  * @returns {any[][]}
@@ -13,6 +28,9 @@ function cacheFinanceTest() {                               // skipcq:  JS-0128
  */
 class CacheFinanceTest {
     constructor() {
+        // const ss = new ScriptSettings();
+        // ss.expire(true);
+
         this.cacheTestRun = new CacheFinanceTestRun();
     }
 
@@ -22,27 +40,28 @@ class CacheFinanceTest {
      */
     execute() {
         this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "NYSEARCA:SHYG");
-        this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "badSymbol");
-        this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "ZTL");
         this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "TSE:MEG");
+        this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "TSE:RY");
         this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "NASDAQ:MSFT");
         
         this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "NYSEARCA:SHYG");
-        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "ZTL");
         this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:ZTL");
         this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:DFN-A");
         this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "ZTL", "STOCK");
         this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:DFN-A", "STOCK");
         this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "NASDAQ:MSFT", "STOCK");
-        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "badSymbol");
+        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:RY", "STOCK");
 
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "NYSEARCA:SHYG");
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:FTN-A");
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:HBF.B");
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:MEG");
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:ZTL");
+        this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:RY");
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "NASDAQ:MSFT");
-        this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "badSymbol");
+
+        this.cacheTestRun.run("OptimalSite", ThirdPartyFinance.get, "TSE:RY", "PRICE");
+        this.cacheTestRun.run("OptimalSite", ThirdPartyFinance.get, "NASDAQ:BNDX", "PRICE");
 
         return this.cacheTestRun.getTestRunResults();
     }
@@ -115,7 +134,7 @@ class CacheFinanceTestRun {
 }
 
 /**
- * Individual test results and tracking.
+ * @classdesc Individual test results and tracking.
  */
 class CacheFinanceTestStatus {
     constructor (serviceName="", symbol="") {
