@@ -319,7 +319,7 @@ class PropertyData {
 /**
  * @classdesc Find STOCK/ETF data by scraping data from 3rd party finance websites.
  */
-class ThirdPartyFinance {
+class ThirdPartyFinance {                   //  skipcq: JS-0128
     /**
      * 
      * @param {String} symbol 
