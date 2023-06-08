@@ -413,9 +413,34 @@ class GlobeAndMail {
  */
 class StockAttributes {
     constructor() {
-        this.yieldPct = null;
-        this.stockName = null;
-        this.stockPrice = null;
+        this._yieldPct = null;
+        this._stockName = null;
+        this._stockPrice = null;
+    }
+
+    get yieldPct() {
+        return this._yieldPct;
+    }
+    set yieldPct(value) {
+        if (value !== null) {
+            this._yieldPct = Math.round(value * 10000) / 10000;
+        }
+    }
+
+    get stockPrice() {
+        return this._stockPrice;
+    }
+    set stockPrice(value) {
+        if (value !== null) {
+            this._stockPrice = Math.round(value * 100) / 100;
+        }
+    }
+
+    get stockName() {
+        return this._stockName;
+    }
+    set stockName(value) {
+        this._stockName = value;
     }
 
     /**

@@ -1,8 +1,7 @@
 /*  *** DEBUG START ***
 //  Remove comments for testing in NODE
 
-import { StockAttributes } from "./CacheFinanceWebSites.js";
-import { TdMarketResearch, GlobeAndMail, YahooFinance} from "./CacheFinanceWebSites.js";
+import { TdMarketResearch, GlobeAndMail, YahooFinance, StockAttributes } from "./CacheFinanceWebSites.js";
 import { ThirdPartyFinance } from "./CacheFinance3rdParty.js";
 export { cacheFinanceTest };
 
@@ -28,9 +27,6 @@ function cacheFinanceTest() {                               // skipcq:  JS-0128
  */
 class CacheFinanceTest {
     constructor() {
-        // const ss = new ScriptSettings();
-        // ss.expire(true);
-
         this.cacheTestRun = new CacheFinanceTestRun();
     }
 

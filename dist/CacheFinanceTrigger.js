@@ -4,7 +4,10 @@ const GOOGLEFINANCE_PARAM_NOT_USED = "##NotSet##";
 /**
  * Replacement function to GOOGLEFINANCE for stock symbols not recognized by google.
  * @param {string} symbol 
- * @param {string} attribute - ["price", "yieldpct", "name"] - "TEST" - returns test results from 3rd party sites.
+ * @param {string} attribute - ["price", "yieldpct", "name"] - 
+ * Special Attributes.
+ *  "TEST" - returns test results from 3rd party sites.
+ *  "CLEARCACHE" - Removes all Script Properties (used for long term cache) created by CACHEFINANCE
  * @param {any} googleFinanceValue - Optional.  Use GOOGLEFINANCE() to get value, if '#N/A' will read cache.
  * @returns {any}
  * @customfunction
@@ -14,6 +17,12 @@ function CACHEFINANCE(symbol, attribute = "price", googleFinanceValue = GOOGLEFI
 
     if (attribute.toUpperCase() === "TEST") {
         return cacheFinanceTest();
+    }
+
+    if (attribute.toUpperCase() == "CLEARCACHE") {
+        const ss = new ScriptSettings();
+        ss.expire(true);
+        return 'Cache Cleared';
     }
 
     if (symbol === '' || attribute === '') {
@@ -134,11 +143,11 @@ class CacheFinance {
     static saveAllFinanceValuesToCache(symbol, stockAttributes) {
         if (stockAttributes === null)
             return;
-        if (stockAttributes.stockName !== null)
+        if (stockAttributes.isAttributeSet("NAME"))
             CacheFinance.saveFinanceValueToCache(CacheFinance.makeCacheKey(symbol, "NAME"), stockAttributes.stockName, 1200);
-        if (stockAttributes.stockPrice !== null)
+        if (stockAttributes.isAttributeSet("PRICE"))
             CacheFinance.saveFinanceValueToCache(CacheFinance.makeCacheKey(symbol, "PRICE"), stockAttributes.stockPrice, 1200);
-        if (stockAttributes.yieldPct !== null)
+        if (stockAttributes.isAttributeSet("YIELDPCT"))
             CacheFinance.saveFinanceValueToCache(CacheFinance.makeCacheKey(symbol, "YIELDPCT"), stockAttributes.yieldPct, 1200);
     }
 
@@ -1220,12 +1229,6 @@ class ThirdPartyFinance {                   //  skipcq: JS-0128
         const searcher = new FinanceWebsiteSearch();
         const data = searcher.get(symbol, attribute);
 
-        if (data.stockPrice !== null)
-            data.stockPrice = Math.round(data.stockPrice * 100) / 100;
-
-        if (data.yieldPct !== null)
-            data.yieldPct = Math.round(data.yieldPct * 10000) / 10000;
-
         return data;
     }
 }
@@ -1336,8 +1339,12 @@ class FinanceWebsiteSearch {
  * This object will be converted to JSON for storage.
  */
 class FinanceSiteList {
-    constructor(symbol) {
-        this.symbol = symbol;
+    /**
+     * Initialize object to store optimal lookup sites for given stock symbol.
+     * @param {String} stockSymbol 
+     */
+    constructor(stockSymbol) {
+        this.symbol = stockSymbol;
         /** @property {String[]} */
         this.priceSites = [];
         /** @property {String[]} */
@@ -1384,6 +1391,10 @@ class FinanceSiteList {
  * @classdesc For analyzing finance websites.
  */
 class FinanceSiteLookupAnalyzer {
+    /**
+     * Initialize object to compare finance sites for completeness and speed.
+     * @param {String} symbol 
+     */
     constructor(symbol) {
         this.symbol = symbol;
         /** @property {FinanceSiteLookupStats[]} */
@@ -1533,9 +1544,6 @@ function cacheFinanceTest() {                               // skipcq:  JS-0128
  */
 class CacheFinanceTest {
     constructor() {
-        // const ss = new ScriptSettings();
-        // ss.expire(true);
-
         this.cacheTestRun = new CacheFinanceTestRun();
     }
 
@@ -2145,9 +2153,34 @@ class GlobeAndMail {
  */
 class StockAttributes {
     constructor() {
-        this.yieldPct = null;
-        this.stockName = null;
-        this.stockPrice = null;
+        this._yieldPct = null;
+        this._stockName = null;
+        this._stockPrice = null;
+    }
+
+    get yieldPct() {
+        return this._yieldPct;
+    }
+    set yieldPct(value) {
+        if (value !== null) {
+            this._yieldPct = Math.round(value * 10000) / 10000;
+        }
+    }
+
+    get stockPrice() {
+        return this._stockPrice;
+    }
+    set stockPrice(value) {
+        if (value !== null) {
+            this._stockPrice = Math.round(value * 100) / 100;
+        }
+    }
+
+    get stockName() {
+        return this._stockName;
+    }
+    set stockName(value) {
+        this._stockName = value;
     }
 
     /**

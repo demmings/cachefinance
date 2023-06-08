@@ -19,7 +19,10 @@ const GOOGLEFINANCE_PARAM_NOT_USED = "##NotSet##";
 /**
  * Replacement function to GOOGLEFINANCE for stock symbols not recognized by google.
  * @param {string} symbol 
- * @param {string} attribute - ["price", "yieldpct", "name"] - "TEST" - returns test results from 3rd party sites.
+ * @param {string} attribute - ["price", "yieldpct", "name"] - 
+ * Special Attributes.
+ *  "TEST" - returns test results from 3rd party sites.
+ *  "CLEARCACHE" - Removes all Script Properties (used for long term cache) created by CACHEFINANCE
  * @param {any} googleFinanceValue - Optional.  Use GOOGLEFINANCE() to get value, if '#N/A' will read cache.
  * @returns {any}
  * @customfunction
@@ -29,6 +32,12 @@ function CACHEFINANCE(symbol, attribute = "price", googleFinanceValue = GOOGLEFI
 
     if (attribute.toUpperCase() === "TEST") {
         return cacheFinanceTest();
+    }
+
+    if (attribute.toUpperCase() == "CLEARCACHE") {
+        const ss = new ScriptSettings();
+        ss.expire(true);
+        return 'Cache Cleared';
     }
 
     if (symbol === '' || attribute === '') {
@@ -149,11 +158,11 @@ class CacheFinance {
     static saveAllFinanceValuesToCache(symbol, stockAttributes) {
         if (stockAttributes === null)
             return;
-        if (stockAttributes.stockName !== null)
+        if (stockAttributes.isAttributeSet("NAME"))
             CacheFinance.saveFinanceValueToCache(CacheFinance.makeCacheKey(symbol, "NAME"), stockAttributes.stockName, 1200);
-        if (stockAttributes.stockPrice !== null)
+        if (stockAttributes.isAttributeSet("PRICE"))
             CacheFinance.saveFinanceValueToCache(CacheFinance.makeCacheKey(symbol, "PRICE"), stockAttributes.stockPrice, 1200);
-        if (stockAttributes.yieldPct !== null)
+        if (stockAttributes.isAttributeSet("YIELDPCT"))
             CacheFinance.saveFinanceValueToCache(CacheFinance.makeCacheKey(symbol, "YIELDPCT"), stockAttributes.yieldPct, 1200);
     }
 

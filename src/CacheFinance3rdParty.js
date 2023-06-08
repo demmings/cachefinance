@@ -26,12 +26,6 @@ class ThirdPartyFinance {                   //  skipcq: JS-0128
         const searcher = new FinanceWebsiteSearch();
         const data = searcher.get(symbol, attribute);
 
-        if (data.stockPrice !== null)
-            data.stockPrice = Math.round(data.stockPrice * 100) / 100;
-
-        if (data.yieldPct !== null)
-            data.yieldPct = Math.round(data.yieldPct * 10000) / 10000;
-
         return data;
     }
 }
@@ -142,8 +136,12 @@ class FinanceWebsiteSearch {
  * This object will be converted to JSON for storage.
  */
 class FinanceSiteList {
-    constructor(symbol) {
-        this.symbol = symbol;
+    /**
+     * Initialize object to store optimal lookup sites for given stock symbol.
+     * @param {String} stockSymbol 
+     */
+    constructor(stockSymbol) {
+        this.symbol = stockSymbol;
         /** @property {String[]} */
         this.priceSites = [];
         /** @property {String[]} */
@@ -190,6 +188,10 @@ class FinanceSiteList {
  * @classdesc For analyzing finance websites.
  */
 class FinanceSiteLookupAnalyzer {
+    /**
+     * Initialize object to compare finance sites for completeness and speed.
+     * @param {String} symbol 
+     */
     constructor(symbol) {
         this.symbol = symbol;
         /** @property {FinanceSiteLookupStats[]} */
