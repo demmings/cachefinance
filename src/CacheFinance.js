@@ -34,7 +34,7 @@ function CACHEFINANCE(symbol, attribute = "price", googleFinanceValue = GOOGLEFI
         return cacheFinanceTest();
     }
 
-    if (attribute.toUpperCase() == "CLEARCACHE") {
+    if (attribute.toUpperCase() === "CLEARCACHE") {
         const ss = new ScriptSettings();
         ss.expire(true);
         return 'Cache Cleared';
