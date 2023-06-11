@@ -22,6 +22,8 @@
 * Valid **STOCK** data is always available even when GOOGLEFINANCE refuses to work.
 * GOOGLEFINANCE does not support all stock symbols.  Many unsupported google stocks can still get price/name/yield data (using web screen scraping)
 * As you can guess from the name, data is cached so when '#N/A' appears, it uses the last known value so that it does not mess up your asset history logging/graphing.
+* [All My Google Sheets Work](https://demmings.github.io/index.html)
+* [CacheFinance Web site](https://demmings.github.io/notes/cachefinance.html)
     
 </td>
 </tr>

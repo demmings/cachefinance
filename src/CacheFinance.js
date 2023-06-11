@@ -17,7 +17,7 @@ class Logger {
 const GOOGLEFINANCE_PARAM_NOT_USED = "##NotSet##";
 
 /**
- * Replacement function to GOOGLEFINANCE for stock symbols not recognized by google.
+ * Enhancement to GOOGLEFINANCE function for stock/ETF symbols that a) return "#N/A" (temporary or consistently), b) data never available like 'yieldpct' for ETF's. 
  * @param {string} symbol 
  * @param {string} attribute - ["price", "yieldpct", "name"] - 
  * Special Attributes.
@@ -83,8 +83,9 @@ class CacheFinance {
         //  GOOGLEFINANCE has failed OR was not used.  Is it in the cache?
         const data = CacheFinance.getFinanceValueFromCache(cacheKey, useShortCacheOnly);
 
-        if (data !== null)
+        if (data !== null) {
             return data;
+        }
 
         //  Last resort... try other sites.
         let stockAttributes = ThirdPartyFinance.get(symbol, attribute);
@@ -92,8 +93,9 @@ class CacheFinance {
         //  Failed third party lookup, try using long term cache.
         if (!stockAttributes.isAttributeSet(attribute)) {
             const cachedStockAttribute = CacheFinance.getFinanceValueFromCache(cacheKey, false);
-            if (cachedStockAttribute !== null)
+            if (cachedStockAttribute !== null) {
                 stockAttributes = cachedStockAttribute;
+            }
         }
         else {
             //  If we are mostly getting this finance item from a third party, we set the timeout

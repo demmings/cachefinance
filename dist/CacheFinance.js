@@ -2,7 +2,7 @@
 const GOOGLEFINANCE_PARAM_NOT_USED = "##NotSet##";
 
 /**
- * Replacement function to GOOGLEFINANCE for stock symbols not recognized by google.
+ * Enhancement to GOOGLEFINANCE function for stock/ETF symbols that a) return "#N/A" (temporary or consistently), b) data never available like 'yieldpct' for ETF's. 
  * @param {string} symbol 
  * @param {string} attribute - ["price", "yieldpct", "name"] - 
  * Special Attributes.
@@ -68,8 +68,9 @@ class CacheFinance {
         //  GOOGLEFINANCE has failed OR was not used.  Is it in the cache?
         const data = CacheFinance.getFinanceValueFromCache(cacheKey, useShortCacheOnly);
 
-        if (data !== null)
+        if (data !== null) {
             return data;
+        }
 
         //  Last resort... try other sites.
         let stockAttributes = ThirdPartyFinance.get(symbol, attribute);
@@ -77,8 +78,9 @@ class CacheFinance {
         //  Failed third party lookup, try using long term cache.
         if (!stockAttributes.isAttributeSet(attribute)) {
             const cachedStockAttribute = CacheFinance.getFinanceValueFromCache(cacheKey, false);
-            if (cachedStockAttribute !== null)
+            if (cachedStockAttribute !== null) {
                 stockAttributes = cachedStockAttribute;
+            }
         }
         else {
             //  If we are mostly getting this finance item from a third party, we set the timeout
@@ -679,12 +681,14 @@ class CacheFinanceTest {
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:FTN-A");
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:HBF.B");
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:MEG");
-        this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:ZTL");
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:RY");
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "NASDAQ:MSFT");
 
         this.cacheTestRun.run("OptimalSite", ThirdPartyFinance.get, "TSE:RY", "PRICE");
         this.cacheTestRun.run("OptimalSite", ThirdPartyFinance.get, "NASDAQ:BNDX", "PRICE");
+        this.cacheTestRun.run("OptimalSite", ThirdPartyFinance.get, "NASDAQ:BNDX", "NAME");
+        this.cacheTestRun.run("OptimalSite", ThirdPartyFinance.get, "NASDAQ:BNDX", "YIELDPCT");
+        this.cacheTestRun.run("OptimalSite", ThirdPartyFinance.get, "TSE:ZTL", "PRICE");
 
         return this.cacheTestRun.getTestRunResults();
     }
@@ -1335,5 +1339,6 @@ class StockAttributes {
         }
     }
 }
+
 
 
