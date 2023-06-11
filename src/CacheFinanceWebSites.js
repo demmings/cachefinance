@@ -491,53 +491,53 @@ class StockAttributes {
 
 
 /*  *** DEBUG START ***
-class FinnHub {
+// class FinnHub {
 
-    static getInfo(symbol) {
-        const data = new StockAttributes();
-        const API_KEY = "";
-        const URL = `https://finnhub.io/api/v1/quote?symbol=${FinnHub.getTicker(symbol)}&token=${API_KEY}`;
+//     static getInfo(symbol) {
+//         const data = new StockAttributes();
+//         const API_KEY = "";
+//         const URL = `https://finnhub.io/api/v1/quote?symbol=${FinnHub.getTicker(symbol)}&token=${API_KEY}`;
 
-        if (API_KEY.length === 0) {
-            return data;
-        }
+//         if (API_KEY.length === 0) {
+//             return data;
+//         }
 
-        Logger.log(`getStockDividendYield:  ${symbol}`);
-        Logger.log(`URL = ${URL}`);
+//         Logger.log(`getStockDividendYield:  ${symbol}`);
+//         Logger.log(`URL = ${URL}`);
 
-        let jsonStr = null;
-        try {
-            jsonStr = UrlFetchApp.fetch(URL).getContentText();
-        }
-        catch (ex) {
-            return data;
-        }
+//         let jsonStr = null;
+//         try {
+//             jsonStr = UrlFetchApp.fetch(URL).getContentText();
+//         }
+//         catch (ex) {
+//             return data;
+//         }
 
-        const hubData = JSON.parse(jsonStr);
-        data.stockPrice = hubData.c;
-        Logger.log(hubData);
+//         const hubData = JSON.parse(jsonStr);
+//         data.stockPrice = hubData.c;
+//         Logger.log(hubData);
 
-        return data;
-    }
+//         return data;
+//     }
 
-     /**
-     * 
-     * @param {String} symbol 
-     * @returns {String}
-     */
-     static getTicker(symbol) {
-        let modifiedSymbol = symbol;
-        const colon = symbol.indexOf(":");
+//      /**
+//      * 
+//      * @param {String} symbol 
+//      * @returns {String}
+//      */
+//      static getTicker(symbol) {
+//         let modifiedSymbol = symbol;
+//         const colon = symbol.indexOf(":");
 
-        if (colon >= 0) {
-            const symbolParts = symbol.split(":");
+//         if (colon >= 0) {
+//             const symbolParts = symbol.split(":");
 
-            modifiedSymbol = symbolParts[1];
-            if (symbolParts[0] === "TSE")
-                modifiedSymbol = `${symbolParts[1]}.TO`;
+//             modifiedSymbol = symbolParts[1];
+//             if (symbolParts[0] === "TSE")
+//                 modifiedSymbol = `${symbolParts[1]}.TO`;
 
-        }
-        return modifiedSymbol;
-    }
-}
+//         }
+//         return modifiedSymbol;
+//     }
+// }
 //  *** DEBUG END ***/
