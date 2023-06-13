@@ -205,6 +205,11 @@ class CacheFinance {
         Logger.log(`SET GoogleFinance VALUE Long/Short Cache. Key=${key}.  Value=${financialData}. Short ms=${shortMs}. Long ms=${longMs}`);
     }
 
+    /**
+     * 
+     * @param {String} symbol 
+     * @param {String} attribute 
+     */
     static deleteFromCache(symbol, attribute) {
         const key = CacheFinance.makeCacheKey(symbol, attribute);
 

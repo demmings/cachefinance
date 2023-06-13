@@ -133,7 +133,7 @@ class FinanceWebsiteSearch {
      * Delete a stock lookup plan.
      * @param {String} symbol 
      */
-    deleteLookupPlan(symbol) {
+    static deleteLookupPlan(symbol) {
         const longCache = new ScriptSettings();
 
         const cacheKey = FinanceWebsiteSearch.makeCacheKey(symbol);

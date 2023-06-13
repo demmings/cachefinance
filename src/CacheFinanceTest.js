@@ -56,15 +56,11 @@ class CacheFinanceTest {
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:RY");
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "NASDAQ:MSFT");
 
-        CacheFinance.deleteFromCache("TSE:RY", "PRICE");
-        this.cacheTestRun.run("CACHEFINANCE - not cached", CACHEFINANCE, "TSE:RY", "PRICE", "##NotSet##");
-        this.cacheTestRun.run("CACHEFINANCE - cached", CACHEFINANCE, "TSE:RY", "PRICE", "##NotSet##");
-
         const plan = new FinanceWebsiteSearch();
         //  Make fresh lookup plans.
-        plan.deleteLookupPlan("TSE:RY");
-        plan.deleteLookupPlan("NASDAQ:BNDX");
-        plan.deleteLookupPlan("TSE:ZTL");
+        FinanceWebsiteSearch.deleteLookupPlan("TSE:RY");
+        FinanceWebsiteSearch.deleteLookupPlan("NASDAQ:BNDX");
+        FinanceWebsiteSearch.deleteLookupPlan("TSE:ZTL");
 
         plan.getLookupPlan("TSE:RY", "");
         plan.getLookupPlan("NASDAQ:BNDX", "");
@@ -75,6 +71,11 @@ class CacheFinanceTest {
         this.cacheTestRun.run("OptimalSite", ThirdPartyFinance.get, "NASDAQ:BNDX", "NAME");
         this.cacheTestRun.run("OptimalSite", ThirdPartyFinance.get, "NASDAQ:BNDX", "YIELDPCT");
         this.cacheTestRun.run("OptimalSite", ThirdPartyFinance.get, "TSE:ZTL", "PRICE");
+
+        CacheFinance.deleteFromCache("TSE:RY", "PRICE");
+        this.cacheTestRun.run("CACHEFINANCE - not cached", CACHEFINANCE, "TSE:RY", "PRICE", "##NotSet##");
+        this.cacheTestRun.run("CACHEFINANCE - cached", CACHEFINANCE, "TSE:RY", "PRICE", "##NotSet##");
+
 
         return this.cacheTestRun.getTestRunResults();
     }
@@ -121,7 +122,7 @@ class CacheFinanceTestRun {
             }
         }
         catch(ex) {
-            result.setStatus("Error: " + ex);
+            result.setStatus(`Error: ${ex.toString()}`);
         }
         result.finishTimer();
 
@@ -248,6 +249,11 @@ class CacheFinanceTestStatus {
         return this;
     }
 
+    /**
+     * 
+     * @param {String} val 
+     * @returns {CacheFinanceTestStatus}
+     */
     setAttributeLookup(val) {
         this._attributeLookup = val;
         return this;

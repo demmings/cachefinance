@@ -190,6 +190,11 @@ class CacheFinance {
         Logger.log(`SET GoogleFinance VALUE Long/Short Cache. Key=${key}.  Value=${financialData}. Short ms=${shortMs}. Long ms=${longMs}`);
     }
 
+    /**
+     * 
+     * @param {String} symbol 
+     * @param {String} attribute 
+     */
     static deleteFromCache(symbol, attribute) {
         const key = CacheFinance.makeCacheKey(symbol, attribute);
 
@@ -1365,7 +1370,7 @@ class FinanceWebsiteSearch {
      * Delete a stock lookup plan.
      * @param {String} symbol 
      */
-    deleteLookupPlan(symbol) {
+    static deleteLookupPlan(symbol) {
         const longCache = new ScriptSettings();
 
         const cacheKey = FinanceWebsiteSearch.makeCacheKey(symbol);
@@ -1612,15 +1617,11 @@ class CacheFinanceTest {
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:RY");
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "NASDAQ:MSFT");
 
-        CacheFinance.deleteFromCache("TSE:RY", "PRICE");
-        this.cacheTestRun.run("CACHEFINANCE - not cached", CACHEFINANCE, "TSE:RY", "PRICE", "##NotSet##");
-        this.cacheTestRun.run("CACHEFINANCE - cached", CACHEFINANCE, "TSE:RY", "PRICE", "##NotSet##");
-
         const plan = new FinanceWebsiteSearch();
         //  Make fresh lookup plans.
-        plan.deleteLookupPlan("TSE:RY");
-        plan.deleteLookupPlan("NASDAQ:BNDX");
-        plan.deleteLookupPlan("TSE:ZTL");
+        FinanceWebsiteSearch.deleteLookupPlan("TSE:RY");
+        FinanceWebsiteSearch.deleteLookupPlan("NASDAQ:BNDX");
+        FinanceWebsiteSearch.deleteLookupPlan("TSE:ZTL");
 
         plan.getLookupPlan("TSE:RY", "");
         plan.getLookupPlan("NASDAQ:BNDX", "");
@@ -1631,6 +1632,11 @@ class CacheFinanceTest {
         this.cacheTestRun.run("OptimalSite", ThirdPartyFinance.get, "NASDAQ:BNDX", "NAME");
         this.cacheTestRun.run("OptimalSite", ThirdPartyFinance.get, "NASDAQ:BNDX", "YIELDPCT");
         this.cacheTestRun.run("OptimalSite", ThirdPartyFinance.get, "TSE:ZTL", "PRICE");
+
+        CacheFinance.deleteFromCache("TSE:RY", "PRICE");
+        this.cacheTestRun.run("CACHEFINANCE - not cached", CACHEFINANCE, "TSE:RY", "PRICE", "##NotSet##");
+        this.cacheTestRun.run("CACHEFINANCE - cached", CACHEFINANCE, "TSE:RY", "PRICE", "##NotSet##");
+
 
         return this.cacheTestRun.getTestRunResults();
     }
@@ -1677,7 +1683,7 @@ class CacheFinanceTestRun {
             }
         }
         catch(ex) {
-            result.setStatus("Error: " + ex);
+            result.setStatus(`Error: ${ex.toString()}`);
         }
         result.finishTimer();
 
@@ -1804,6 +1810,11 @@ class CacheFinanceTestStatus {
         return this;
     }
 
+    /**
+     * 
+     * @param {String} val 
+     * @returns {CacheFinanceTestStatus}
+     */
     setAttributeLookup(val) {
         this._attributeLookup = val;
         return this;
@@ -2157,10 +2168,9 @@ class YahooFinance {
     /**
      * 
      * @param {String} symbol 
-     * @param {String} attribute
      * @returns {StockAttributes}
      */
-    static getInfo(symbol, attribute) {
+    static getInfo(symbol) {
         const data = new StockAttributes();
 
         const URL = `https://finance.yahoo.com/quote/${YahooFinance.getTicker(symbol)}`;
@@ -2239,10 +2249,9 @@ class GlobeAndMail {
     /**
      * Only gets dividend yield.
      * @param {String} symbol 
-     * @param {String} attribute
      * @returns {StockAttributes}
      */
-    static getInfo(symbol, attribute = "ALL") {
+    static getInfo(symbol) {
         const data = new StockAttributes();
         const URL = `https://www.theglobeandmail.com/investing/markets/stocks/${GlobeAndMail.getTicker(symbol)}`;
 
@@ -2354,13 +2363,13 @@ class FinnHub {
         }
 
         if (attribute !== "PRICE") {
-            Logger.log("Finnhub.  Only PRICE is supported: " + symbol + ", " + attribute);
+            Logger.log(`Finnhub.  Only PRICE is supported: ${symbol}, ${attribute}`);
             return data;
         }
 
         const countryCode = CacheFinanceWebSites.getTickerCountryCode(symbol);
         if (countryCode !== "us") {
-            Logger.log("FinnHub --> Only U.S. stocks: " + symbol);
+            Logger.log(`FinnHub --> Only U.S. stocks: ${symbol}`);
             return data;
         }
 
