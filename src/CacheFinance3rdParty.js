@@ -3,7 +3,7 @@
 
 import { ScriptSettings } from "./SQL/ScriptSettings.js";
 import { CacheFinanceWebSites, StockAttributes, FinanceWebSite } from "./CacheFinanceWebSites.js";
-export { ThirdPartyFinance };
+export { ThirdPartyFinance, FinanceWebsiteSearch };
 
 class Logger {
     static log(msg) {
@@ -129,6 +129,17 @@ class FinanceWebsiteSearch {
         return { lookupPlan, data };
     }
 
+    /**
+     * Delete a stock lookup plan.
+     * @param {String} symbol 
+     */
+    deleteLookupPlan(symbol) {
+        const longCache = new ScriptSettings();
+
+        const cacheKey = FinanceWebsiteSearch.makeCacheKey(symbol);
+         
+        longCache.delete(cacheKey);
+    }
 }
 
 /**
@@ -277,9 +288,9 @@ class FinanceSiteLookupAnalyzer {
         const sitesSearchFunction = new CacheFinanceWebSites();
         for (const site of siteArr) {
             const siteFunction = sitesSearchFunction.getByName(site);
-            data = siteFunction.getInfo(stockSites.symbol);
+            data = siteFunction.getInfo(stockSites.symbol, attribute);
 
-            if (data !== null) {
+            if (data !== null && data.isAttributeSet(attribute)) {
                 return data;
             }
         }  

@@ -2,7 +2,8 @@
 //  Remove comments for testing in NODE
 
 import { TdMarketResearch, GlobeAndMail, YahooFinance, StockAttributes, FinnHub } from "./CacheFinanceWebSites.js";
-import { ThirdPartyFinance } from "./CacheFinance3rdParty.js";
+import { ThirdPartyFinance, FinanceWebsiteSearch } from "./CacheFinance3rdParty.js";
+import { CACHEFINANCE, CacheFinance } from "./CacheFinance.js";
 export { cacheFinanceTest };
 
 class Logger {
@@ -43,10 +44,10 @@ class CacheFinanceTest {
         this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "NYSEARCA:SHYG");
         this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:ZTL");
         this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:DFN-A");
-        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "ZTL", "STOCK");
-        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:DFN-A", "STOCK");
-        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "NASDAQ:MSFT", "STOCK");
-        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:RY", "STOCK");
+        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "ZTL", "ALL", "STOCK");
+        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:DFN-A", "ALL", "STOCK");
+        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "NASDAQ:MSFT", "ALL", "STOCK");
+        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:RY", "ALL", "STOCK");
 
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "NYSEARCA:SHYG");
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:FTN-A");
@@ -54,6 +55,20 @@ class CacheFinanceTest {
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:MEG");
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:RY");
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "NASDAQ:MSFT");
+
+        CacheFinance.deleteFromCache("TSE:RY", "PRICE");
+        this.cacheTestRun.run("CACHEFINANCE - not cached", CACHEFINANCE, "TSE:RY", "PRICE", "##NotSet##");
+        this.cacheTestRun.run("CACHEFINANCE - cached", CACHEFINANCE, "TSE:RY", "PRICE", "##NotSet##");
+
+        const plan = new FinanceWebsiteSearch();
+        //  Make fresh lookup plans.
+        plan.deleteLookupPlan("TSE:RY");
+        plan.deleteLookupPlan("NASDAQ:BNDX");
+        plan.deleteLookupPlan("TSE:ZTL");
+
+        plan.getLookupPlan("TSE:RY", "");
+        plan.getLookupPlan("NASDAQ:BNDX", "");
+        plan.getLookupPlan("TSE:ZTL", "");
 
         this.cacheTestRun.run("OptimalSite", ThirdPartyFinance.get, "TSE:RY", "PRICE");
         this.cacheTestRun.run("OptimalSite", ThirdPartyFinance.get, "NASDAQ:BNDX", "PRICE");
@@ -79,22 +94,34 @@ class CacheFinanceTestRun {
      * @param {String} serviceName 
      * @param {*} func 
      * @param {String} symbol 
+     * @param {String} attribute
+     * @param {String} type
      */
-    run(serviceName, func, symbol, type = "ETF") {
+    run(serviceName, func, symbol, attribute = "ALL", type = "ETF") {
         const result = new CacheFinanceTestStatus(serviceName, symbol);
         try {
             /** @type {StockAttributes} */
-            const data = func(symbol, type);
-            result.setStatus("ok");
-            result.setStockAttributes(data);
-            result.setTypeLookup(type);
+            let data = func(symbol, attribute, type);
+
+            if (! (data instanceof StockAttributes)) {
+                const myData = new StockAttributes;
+                if (attribute === "PRICE") {
+                    myData.stockPrice = data;
+                    data = myData;
+                }
+            }
+
+            result.setStatus("ok")
+                .setStockAttributes(data)
+                .setTypeLookup(type)
+                .setAttributeLookup(attribute);
 
             if (data.stockName === null && data.stockPrice === null && data.yieldPct === null) {
                 result.setStatus("Not Found!")
             }
         }
         catch(ex) {
-            result.setStatus("Error");
+            result.setStatus("Error: " + ex);
         }
         result.finishTimer();
 
@@ -109,7 +136,7 @@ class CacheFinanceTestRun {
         const resultTable = [];
 
         /** @type {any[]} */
-        let row = ["Service", "Symbol", "Status", "Price", "Yield", "Name", "Type", "Run Time(ms)"];
+        let row = ["Service", "Symbol", "Status", "Price", "Yield", "Name", "Attribute", "Type", "Run Time(ms)"];
         resultTable.push(row);
 
         for (const testRun of this.testRuns) {
@@ -121,6 +148,7 @@ class CacheFinanceTestRun {
             row.push(testRun.stockAttributes.stockPrice);
             row.push(testRun.stockAttributes.yieldPct);
             row.push(testRun.stockAttributes.stockName);
+            row.push(testRun._attributeLookup);
             row.push(testRun.typeLookup);
             row.push(testRun.runTime);
 
@@ -141,6 +169,7 @@ class CacheFinanceTestStatus {
         this._stockAttributes = new StockAttributes();
         this._startTime = Date.now()
         this._typeLookup = "";
+        this._attributeLookup  = "";
         this._runTime = 0;
     }
 
@@ -164,6 +193,9 @@ class CacheFinanceTestStatus {
     }
     get typeLookup() {
         return this._typeLookup;
+    }
+    get attributeLookup() {
+        return this._attributeLookup;
     }
 
     /**
@@ -213,6 +245,11 @@ class CacheFinanceTestStatus {
      */
     setTypeLookup(val) {
         this._typeLookup = val;
+        return this;
+    }
+
+    setAttributeLookup(val) {
+        this._attributeLookup = val;
         return this;
     }
 

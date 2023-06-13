@@ -24,9 +24,7 @@ class CacheFinanceWebSites {
      */
     constructor() {
         this.siteList = [
-            /*  *** DEBUG START ***
             new FinanceWebSite("FinnHub", FinnHub),
-            //  *** DEBUG END ***/
             new FinanceWebSite("TDEtf", TdMarketsEtf),
             new FinanceWebSite("TDStock", TdMarketsStock),
             new FinanceWebSite("Yahoo", YahooFinance),
@@ -95,6 +93,19 @@ class CacheFinanceWebSites {
 
         return countryCode;
     }
+
+    /**
+     * Get script property using key.  If not found, returns null.
+     * @param {String} propertyKey 
+     * @returns {any}
+     */
+    static getApiKey(propertyKey) {
+        const scriptProperties = PropertiesService.getScriptProperties();
+
+        const myData = scriptProperties.getProperty(propertyKey);
+
+        return myData;
+    }
 }
 
 /**
@@ -127,16 +138,95 @@ class FinanceWebSite {
 }
 
 /**
+ * Get/Set data about stocks/ETFs.
+ */
+class StockAttributes {
+    constructor() {
+        this._yieldPct = null;
+        this._stockName = null;
+        this._stockPrice = null;
+    }
+
+    get yieldPct() {
+        return this._yieldPct;
+    }
+    set yieldPct(value) {
+        if (value !== null) {
+            this._yieldPct = Math.round(value * 10000) / 10000;
+        }
+    }
+
+    get stockPrice() {
+        return this._stockPrice;
+    }
+    set stockPrice(value) {
+        if (value !== null) {
+            this._stockPrice = Math.round(value * 100) / 100;
+        }
+    }
+
+    get stockName() {
+        return this._stockName;
+    }
+    set stockName(value) {
+        this._stockName = value;
+    }
+
+    /**
+     * 
+     * @param {String} attribute 
+     * @returns {any}
+     */
+    getValue(attribute) {
+        switch (attribute) {
+            case "PRICE":
+                return (this.stockPrice === null) ? 0 : this.stockPrice;
+
+            case "YIELDPCT":
+                return (this.yieldPct === null) ? 0 : this.yieldPct;
+
+            case "NAME":
+                return (this.stockName === null) ? "" : this.stockName;
+
+            default:
+                return '#N/A';
+        }
+    }
+
+    /**
+     * 
+     * @param {String} attribute 
+     * @returns {Boolean}
+     */
+    isAttributeSet(attribute) {
+        switch (attribute) {
+            case "PRICE":
+                return this.stockPrice !== null;
+
+            case "YIELDPCT":
+                return this.yieldPct !== null;
+
+            case "NAME":
+                return this.stockName !== null;
+
+            default:
+                return false;
+        }
+    }
+}
+
+/**
  * @classdesc TD Markets lookup by ETF symbol
  */
 class TdMarketsEtf {
     /**
      * 
      * @param {String} symbol 
+     * @param {String} attribute
      * @returns {StockAttributes}
      */
-    static getInfo(symbol) {
-        return TdMarketResearch.getInfo(symbol, "ETF");
+    static getInfo(symbol, attribute) {
+        return TdMarketResearch.getInfo(symbol, attribute, "ETF");
     }
 }
 
@@ -147,10 +237,11 @@ class TdMarketsStock {
     /**
      * 
      * @param {String} symbol 
+     * @param {String} attribute
      * @returns {StockAttributes}
      */
-    static getInfo(symbol) {
-        return TdMarketResearch.getInfo(symbol, "STOCK");
+    static getInfo(symbol, attribute) {
+        return TdMarketResearch.getInfo(symbol, attribute, "STOCK");
     }
 }
 
@@ -161,10 +252,11 @@ class TdMarketResearch {
     /**
      * 
      * @param {String} symbol 
+     * @param {String} attribute
      * @param {String} type 
      * @returns {StockAttributes}
      */
-    static getInfo(symbol, type = "ETF") {
+    static getInfo(symbol, attribute, type = "ETF") {
         const data = new StockAttributes();
 
         let URL = null;
@@ -180,7 +272,7 @@ class TdMarketResearch {
         catch (ex) {
             return data;
         }
-        Logger.log(`getStockDividendYield:  ${symbol}`);
+        Logger.log(`getInfo:  ${symbol}`);
         Logger.log(`URL = ${URL}`);
 
         //  Get the dividend yield.
@@ -247,15 +339,23 @@ class YahooFinance {
     /**
      * 
      * @param {String} symbol 
+     * @param {String} attribute
      * @returns {StockAttributes}
      */
-    static getInfo(symbol) {
+    static getInfo(symbol, attribute) {
         const data = new StockAttributes();
 
         const URL = `https://finance.yahoo.com/quote/${YahooFinance.getTicker(symbol)}`;
 
-        const html = UrlFetchApp.fetch(URL).getContentText();
-        Logger.log(`getStockDividendYield:  ${symbol}`);
+        let html = null;
+        try {
+            html = UrlFetchApp.fetch(URL).getContentText();
+        }
+        catch (ex) {
+            return data;
+        }
+
+        Logger.log(`getInfo:  ${symbol}`);
         Logger.log(`URL = ${URL}`);
 
         let dividendPercent = html.match(/"DIVIDEND_AND_YIELD-value">\d*\.\d*\s\((\d*\.\d*)%\)/);
@@ -321,13 +421,14 @@ class GlobeAndMail {
     /**
      * Only gets dividend yield.
      * @param {String} symbol 
+     * @param {String} attribute
      * @returns {StockAttributes}
      */
-    static getInfo(symbol) {
+    static getInfo(symbol, attribute = "ALL") {
         const data = new StockAttributes();
         const URL = `https://www.theglobeandmail.com/investing/markets/stocks/${GlobeAndMail.getTicker(symbol)}`;
 
-        Logger.log(`getStockDividendYield:  ${symbol}`);
+        Logger.log(`getInfo:  ${symbol}`);
         Logger.log(`URL = ${URL}`);
 
         let html = null;
@@ -411,133 +512,76 @@ class GlobeAndMail {
     }
 }
 
+
+
 /**
- * Get/Set data about stocks/ETFs.
+ * @classdesc Uses FINNHUB Rest API.  Requires a script setting for the API key.
+ * Set key name as FINNHUB_API_KEY
  */
-class StockAttributes {
-    constructor() {
-        this._yieldPct = null;
-        this._stockName = null;
-        this._stockPrice = null;
-    }
-
-    get yieldPct() {
-        return this._yieldPct;
-    }
-    set yieldPct(value) {
-        if (value !== null) {
-            this._yieldPct = Math.round(value * 10000) / 10000;
-        }
-    }
-
-    get stockPrice() {
-        return this._stockPrice;
-    }
-    set stockPrice(value) {
-        if (value !== null) {
-            this._stockPrice = Math.round(value * 100) / 100;
-        }
-    }
-
-    get stockName() {
-        return this._stockName;
-    }
-    set stockName(value) {
-        this._stockName = value;
-    }
+class FinnHub {
 
     /**
      * 
+     * @param {String} symbol 
      * @param {String} attribute 
-     * @returns {any}
+     * @returns 
      */
-    getValue(attribute) {
-        switch (attribute) {
-            case "PRICE":
-                return (this.stockPrice === null) ? 0 : this.stockPrice;
+    static getInfo(symbol, attribute = "PRICE") {
+        const data = new StockAttributes();
+        const API_KEY = CacheFinanceWebSites.getApiKey("FINNHUB_API_KEY");
 
-            case "YIELDPCT":
-                return (this.yieldPct === null) ? 0 : this.yieldPct;
-
-            case "NAME":
-                return (this.stockName === null) ? "" : this.stockName;
-
-            default:
-                return '#N/A';
+        if (API_KEY === null) {
+            Logger.log("No FinnHub API Key.");
+            return data;
         }
+
+        if (attribute !== "PRICE") {
+            Logger.log("Finnhub.  Only PRICE is supported: " + symbol + ", " + attribute);
+            return data;
+        }
+
+        const countryCode = CacheFinanceWebSites.getTickerCountryCode(symbol);
+        if (countryCode !== "us") {
+            Logger.log("FinnHub --> Only U.S. stocks: " + symbol);
+            return data;
+        }
+
+        const URL = `https://finnhub.io/api/v1/quote?symbol=${FinnHub.getTicker(symbol)}&token=${API_KEY}`;
+        Logger.log(`getInfo:  ${symbol}`);
+        Logger.log(`URL = ${URL}`);
+
+        let jsonStr = null;
+        try {
+            jsonStr = UrlFetchApp.fetch(URL).getContentText();
+        }
+        catch (ex) {
+            return data;
+        }
+
+        const hubData = JSON.parse(jsonStr);
+        data.stockPrice = hubData.c;
+        Logger.log(hubData);
+
+        return data;
     }
 
     /**
-     * 
-     * @param {String} attribute 
-     * @returns {Boolean}
-     */
-    isAttributeSet(attribute) {
-        switch (attribute) {
-            case "PRICE":
-                return this.stockPrice !== null;
+    * 
+    * @param {String} symbol 
+    * @returns {String}
+    */
+    static getTicker(symbol) {
+        let modifiedSymbol = symbol;
+        const colon = symbol.indexOf(":");
 
-            case "YIELDPCT":
-                return this.yieldPct !== null;
+        if (colon >= 0) {
+            const symbolParts = symbol.split(":");
 
-            case "NAME":
-                return this.stockName !== null;
+            modifiedSymbol = symbolParts[1];
+            if (symbolParts[0] === "TSE")
+                modifiedSymbol = `${symbolParts[1]}.TO`;
 
-            default:
-                return false;
         }
+        return modifiedSymbol;
     }
 }
-
-
-/*  *** DEBUG START ***
-// class FinnHub {
-
-//     static getInfo(symbol) {
-//         const data = new StockAttributes();
-//         const API_KEY = "";
-//         const URL = `https://finnhub.io/api/v1/quote?symbol=${FinnHub.getTicker(symbol)}&token=${API_KEY}`;
-
-//         if (API_KEY.length === 0) {
-//             return data;
-//         }
-
-//         Logger.log(`getStockDividendYield:  ${symbol}`);
-//         Logger.log(`URL = ${URL}`);
-
-//         let jsonStr = null;
-//         try {
-//             jsonStr = UrlFetchApp.fetch(URL).getContentText();
-//         }
-//         catch (ex) {
-//             return data;
-//         }
-
-//         const hubData = JSON.parse(jsonStr);
-//         data.stockPrice = hubData.c;
-//         Logger.log(hubData);
-
-//         return data;
-//     }
-
-//      /**
-//      * 
-//      * @param {String} symbol 
-//      * @returns {String}
-//      */
-//      static getTicker(symbol) {
-//         let modifiedSymbol = symbol;
-//         const colon = symbol.indexOf(":");
-
-//         if (colon >= 0) {
-//             const symbolParts = symbol.split(":");
-
-//             modifiedSymbol = symbolParts[1];
-//             if (symbolParts[0] === "TSE")
-//                 modifiedSymbol = `${symbolParts[1]}.TO`;
-
-//         }
-//         return modifiedSymbol;
-//     }
-// }
-//  *** DEBUG END ***/

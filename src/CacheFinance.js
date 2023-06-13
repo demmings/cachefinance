@@ -5,7 +5,7 @@ import { ScriptSettings } from "./SQL/ScriptSettings.js";
 import { ThirdPartyFinance } from "./CacheFinance3rdParty.js";
 import { cacheFinanceTest } from "./CacheFinanceTest.js";
 import { StockAttributes } from "./CacheFinanceWebSites.js";
-export { CACHEFINANCE };
+export { CACHEFINANCE, CacheFinance };
 
 class Logger {
     static log(msg) {
@@ -203,5 +203,22 @@ class CacheFinance {
         const longMs = new Date().getTime() - start;
 
         Logger.log(`SET GoogleFinance VALUE Long/Short Cache. Key=${key}.  Value=${financialData}. Short ms=${shortMs}. Long ms=${longMs}`);
+    }
+
+    static deleteFromCache(symbol, attribute) {
+        const key = CacheFinance.makeCacheKey(symbol, attribute);
+
+        const shortCache = CacheService.getScriptCache();
+        const longCache = new ScriptSettings();   
+        
+        const currentShortCacheValue = shortCache.get(key);
+        if (currentShortCacheValue !== null) {
+            shortCache.remove(key);
+        }
+
+        const currentLongCacheValue = longCache.get(key);
+        if (currentLongCacheValue !== null) {
+            longCache.delete(key);
+        }
     }
 }

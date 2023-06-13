@@ -91,6 +91,16 @@ class ScriptSettings {      //  skipcq: JS-0128
             }
         }
     }
+
+    /**
+     * Delete a specific key in script properties.
+     * @param {String} key 
+     */
+    delete(key) {
+        if (this.scriptProperties.getProperty(key) !== null) {
+            this.scriptProperties.deleteProperty(key);
+        }
+    }
 }
 
 /** Converts data into JSON for getting/setting in ScriptSettings. */

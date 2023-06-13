@@ -189,6 +189,23 @@ class CacheFinance {
 
         Logger.log(`SET GoogleFinance VALUE Long/Short Cache. Key=${key}.  Value=${financialData}. Short ms=${shortMs}. Long ms=${longMs}`);
     }
+
+    static deleteFromCache(symbol, attribute) {
+        const key = CacheFinance.makeCacheKey(symbol, attribute);
+
+        const shortCache = CacheService.getScriptCache();
+        const longCache = new ScriptSettings();   
+        
+        const currentShortCacheValue = shortCache.get(key);
+        if (currentShortCacheValue !== null) {
+            shortCache.remove(key);
+        }
+
+        const currentLongCacheValue = longCache.get(key);
+        if (currentLongCacheValue !== null) {
+            longCache.delete(key);
+        }
+    }
 }
 
 //  Named range in sheet with CacheFinance configurations.
@@ -1168,6 +1185,16 @@ class ScriptSettings {      //  skipcq: JS-0128
             }
         }
     }
+
+    /**
+     * Delete a specific key in script properties.
+     * @param {String} key 
+     */
+    delete(key) {
+        if (this.scriptProperties.getProperty(key) !== null) {
+            this.scriptProperties.deleteProperty(key);
+        }
+    }
 }
 
 /** Converts data into JSON for getting/setting in ScriptSettings. */
@@ -1334,6 +1361,17 @@ class FinanceWebsiteSearch {
         return { lookupPlan, data };
     }
 
+    /**
+     * Delete a stock lookup plan.
+     * @param {String} symbol 
+     */
+    deleteLookupPlan(symbol) {
+        const longCache = new ScriptSettings();
+
+        const cacheKey = FinanceWebsiteSearch.makeCacheKey(symbol);
+         
+        longCache.delete(cacheKey);
+    }
 }
 
 /**
@@ -1482,9 +1520,9 @@ class FinanceSiteLookupAnalyzer {
         const sitesSearchFunction = new CacheFinanceWebSites();
         for (const site of siteArr) {
             const siteFunction = sitesSearchFunction.getByName(site);
-            data = siteFunction.getInfo(stockSites.symbol);
+            data = siteFunction.getInfo(stockSites.symbol, attribute);
 
-            if (data !== null) {
+            if (data !== null && data.isAttributeSet(attribute)) {
                 return data;
             }
         }  
@@ -1562,10 +1600,10 @@ class CacheFinanceTest {
         this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "NYSEARCA:SHYG");
         this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:ZTL");
         this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:DFN-A");
-        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "ZTL", "STOCK");
-        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:DFN-A", "STOCK");
-        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "NASDAQ:MSFT", "STOCK");
-        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:RY", "STOCK");
+        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "ZTL", "ALL", "STOCK");
+        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:DFN-A", "ALL", "STOCK");
+        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "NASDAQ:MSFT", "ALL", "STOCK");
+        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:RY", "ALL", "STOCK");
 
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "NYSEARCA:SHYG");
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:FTN-A");
@@ -1573,6 +1611,20 @@ class CacheFinanceTest {
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:MEG");
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:RY");
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "NASDAQ:MSFT");
+
+        CacheFinance.deleteFromCache("TSE:RY", "PRICE");
+        this.cacheTestRun.run("CACHEFINANCE - not cached", CACHEFINANCE, "TSE:RY", "PRICE", "##NotSet##");
+        this.cacheTestRun.run("CACHEFINANCE - cached", CACHEFINANCE, "TSE:RY", "PRICE", "##NotSet##");
+
+        const plan = new FinanceWebsiteSearch();
+        //  Make fresh lookup plans.
+        plan.deleteLookupPlan("TSE:RY");
+        plan.deleteLookupPlan("NASDAQ:BNDX");
+        plan.deleteLookupPlan("TSE:ZTL");
+
+        plan.getLookupPlan("TSE:RY", "");
+        plan.getLookupPlan("NASDAQ:BNDX", "");
+        plan.getLookupPlan("TSE:ZTL", "");
 
         this.cacheTestRun.run("OptimalSite", ThirdPartyFinance.get, "TSE:RY", "PRICE");
         this.cacheTestRun.run("OptimalSite", ThirdPartyFinance.get, "NASDAQ:BNDX", "PRICE");
@@ -1598,22 +1650,34 @@ class CacheFinanceTestRun {
      * @param {String} serviceName 
      * @param {*} func 
      * @param {String} symbol 
+     * @param {String} attribute
+     * @param {String} type
      */
-    run(serviceName, func, symbol, type = "ETF") {
+    run(serviceName, func, symbol, attribute = "ALL", type = "ETF") {
         const result = new CacheFinanceTestStatus(serviceName, symbol);
         try {
             /** @type {StockAttributes} */
-            const data = func(symbol, type);
-            result.setStatus("ok");
-            result.setStockAttributes(data);
-            result.setTypeLookup(type);
+            let data = func(symbol, attribute, type);
+
+            if (! (data instanceof StockAttributes)) {
+                const myData = new StockAttributes;
+                if (attribute === "PRICE") {
+                    myData.stockPrice = data;
+                    data = myData;
+                }
+            }
+
+            result.setStatus("ok")
+                .setStockAttributes(data)
+                .setTypeLookup(type)
+                .setAttributeLookup(attribute);
 
             if (data.stockName === null && data.stockPrice === null && data.yieldPct === null) {
                 result.setStatus("Not Found!")
             }
         }
         catch(ex) {
-            result.setStatus("Error");
+            result.setStatus("Error: " + ex);
         }
         result.finishTimer();
 
@@ -1628,7 +1692,7 @@ class CacheFinanceTestRun {
         const resultTable = [];
 
         /** @type {any[]} */
-        let row = ["Service", "Symbol", "Status", "Price", "Yield", "Name", "Type", "Run Time(ms)"];
+        let row = ["Service", "Symbol", "Status", "Price", "Yield", "Name", "Attribute", "Type", "Run Time(ms)"];
         resultTable.push(row);
 
         for (const testRun of this.testRuns) {
@@ -1640,6 +1704,7 @@ class CacheFinanceTestRun {
             row.push(testRun.stockAttributes.stockPrice);
             row.push(testRun.stockAttributes.yieldPct);
             row.push(testRun.stockAttributes.stockName);
+            row.push(testRun._attributeLookup);
             row.push(testRun.typeLookup);
             row.push(testRun.runTime);
 
@@ -1660,6 +1725,7 @@ class CacheFinanceTestStatus {
         this._stockAttributes = new StockAttributes();
         this._startTime = Date.now()
         this._typeLookup = "";
+        this._attributeLookup  = "";
         this._runTime = 0;
     }
 
@@ -1683,6 +1749,9 @@ class CacheFinanceTestStatus {
     }
     get typeLookup() {
         return this._typeLookup;
+    }
+    get attributeLookup() {
+        return this._attributeLookup;
     }
 
     /**
@@ -1735,6 +1804,11 @@ class CacheFinanceTestStatus {
         return this;
     }
 
+    setAttributeLookup(val) {
+        this._attributeLookup = val;
+        return this;
+    }
+
     /**
      * 
      * @param {StockAttributes} val 
@@ -1768,6 +1842,7 @@ class CacheFinanceWebSites {
      */
     constructor() {
         this.siteList = [
+            new FinanceWebSite("FinnHub", FinnHub),
             new FinanceWebSite("TDEtf", TdMarketsEtf),
             new FinanceWebSite("TDStock", TdMarketsStock),
             new FinanceWebSite("Yahoo", YahooFinance),
@@ -1836,6 +1911,19 @@ class CacheFinanceWebSites {
 
         return countryCode;
     }
+
+    /**
+     * Get script property using key.  If not found, returns null.
+     * @param {String} propertyKey 
+     * @returns {any}
+     */
+    static getApiKey(propertyKey) {
+        const scriptProperties = PropertiesService.getScriptProperties();
+
+        const myData = scriptProperties.getProperty(propertyKey);
+
+        return myData;
+    }
 }
 
 /**
@@ -1868,16 +1956,95 @@ class FinanceWebSite {
 }
 
 /**
+ * Get/Set data about stocks/ETFs.
+ */
+class StockAttributes {
+    constructor() {
+        this._yieldPct = null;
+        this._stockName = null;
+        this._stockPrice = null;
+    }
+
+    get yieldPct() {
+        return this._yieldPct;
+    }
+    set yieldPct(value) {
+        if (value !== null) {
+            this._yieldPct = Math.round(value * 10000) / 10000;
+        }
+    }
+
+    get stockPrice() {
+        return this._stockPrice;
+    }
+    set stockPrice(value) {
+        if (value !== null) {
+            this._stockPrice = Math.round(value * 100) / 100;
+        }
+    }
+
+    get stockName() {
+        return this._stockName;
+    }
+    set stockName(value) {
+        this._stockName = value;
+    }
+
+    /**
+     * 
+     * @param {String} attribute 
+     * @returns {any}
+     */
+    getValue(attribute) {
+        switch (attribute) {
+            case "PRICE":
+                return (this.stockPrice === null) ? 0 : this.stockPrice;
+
+            case "YIELDPCT":
+                return (this.yieldPct === null) ? 0 : this.yieldPct;
+
+            case "NAME":
+                return (this.stockName === null) ? "" : this.stockName;
+
+            default:
+                return '#N/A';
+        }
+    }
+
+    /**
+     * 
+     * @param {String} attribute 
+     * @returns {Boolean}
+     */
+    isAttributeSet(attribute) {
+        switch (attribute) {
+            case "PRICE":
+                return this.stockPrice !== null;
+
+            case "YIELDPCT":
+                return this.yieldPct !== null;
+
+            case "NAME":
+                return this.stockName !== null;
+
+            default:
+                return false;
+        }
+    }
+}
+
+/**
  * @classdesc TD Markets lookup by ETF symbol
  */
 class TdMarketsEtf {
     /**
      * 
      * @param {String} symbol 
+     * @param {String} attribute
      * @returns {StockAttributes}
      */
-    static getInfo(symbol) {
-        return TdMarketResearch.getInfo(symbol, "ETF");
+    static getInfo(symbol, attribute) {
+        return TdMarketResearch.getInfo(symbol, attribute, "ETF");
     }
 }
 
@@ -1888,10 +2055,11 @@ class TdMarketsStock {
     /**
      * 
      * @param {String} symbol 
+     * @param {String} attribute
      * @returns {StockAttributes}
      */
-    static getInfo(symbol) {
-        return TdMarketResearch.getInfo(symbol, "STOCK");
+    static getInfo(symbol, attribute) {
+        return TdMarketResearch.getInfo(symbol, attribute, "STOCK");
     }
 }
 
@@ -1902,10 +2070,11 @@ class TdMarketResearch {
     /**
      * 
      * @param {String} symbol 
+     * @param {String} attribute
      * @param {String} type 
      * @returns {StockAttributes}
      */
-    static getInfo(symbol, type = "ETF") {
+    static getInfo(symbol, attribute, type = "ETF") {
         const data = new StockAttributes();
 
         let URL = null;
@@ -1921,7 +2090,7 @@ class TdMarketResearch {
         catch (ex) {
             return data;
         }
-        Logger.log(`getStockDividendYield:  ${symbol}`);
+        Logger.log(`getInfo:  ${symbol}`);
         Logger.log(`URL = ${URL}`);
 
         //  Get the dividend yield.
@@ -1988,15 +2157,23 @@ class YahooFinance {
     /**
      * 
      * @param {String} symbol 
+     * @param {String} attribute
      * @returns {StockAttributes}
      */
-    static getInfo(symbol) {
+    static getInfo(symbol, attribute) {
         const data = new StockAttributes();
 
         const URL = `https://finance.yahoo.com/quote/${YahooFinance.getTicker(symbol)}`;
 
-        const html = UrlFetchApp.fetch(URL).getContentText();
-        Logger.log(`getStockDividendYield:  ${symbol}`);
+        let html = null;
+        try {
+            html = UrlFetchApp.fetch(URL).getContentText();
+        }
+        catch (ex) {
+            return data;
+        }
+
+        Logger.log(`getInfo:  ${symbol}`);
         Logger.log(`URL = ${URL}`);
 
         let dividendPercent = html.match(/"DIVIDEND_AND_YIELD-value">\d*\.\d*\s\((\d*\.\d*)%\)/);
@@ -2062,13 +2239,14 @@ class GlobeAndMail {
     /**
      * Only gets dividend yield.
      * @param {String} symbol 
+     * @param {String} attribute
      * @returns {StockAttributes}
      */
-    static getInfo(symbol) {
+    static getInfo(symbol, attribute = "ALL") {
         const data = new StockAttributes();
         const URL = `https://www.theglobeandmail.com/investing/markets/stocks/${GlobeAndMail.getTicker(symbol)}`;
 
-        Logger.log(`getStockDividendYield:  ${symbol}`);
+        Logger.log(`getInfo:  ${symbol}`);
         Logger.log(`URL = ${URL}`);
 
         let html = null;
@@ -2152,83 +2330,77 @@ class GlobeAndMail {
     }
 }
 
+
+
 /**
- * Get/Set data about stocks/ETFs.
+ * @classdesc Uses FINNHUB Rest API.  Requires a script setting for the API key.
+ * Set key name as FINNHUB_API_KEY
  */
-class StockAttributes {
-    constructor() {
-        this._yieldPct = null;
-        this._stockName = null;
-        this._stockPrice = null;
-    }
-
-    get yieldPct() {
-        return this._yieldPct;
-    }
-    set yieldPct(value) {
-        if (value !== null) {
-            this._yieldPct = Math.round(value * 10000) / 10000;
-        }
-    }
-
-    get stockPrice() {
-        return this._stockPrice;
-    }
-    set stockPrice(value) {
-        if (value !== null) {
-            this._stockPrice = Math.round(value * 100) / 100;
-        }
-    }
-
-    get stockName() {
-        return this._stockName;
-    }
-    set stockName(value) {
-        this._stockName = value;
-    }
+class FinnHub {
 
     /**
      * 
+     * @param {String} symbol 
      * @param {String} attribute 
-     * @returns {any}
+     * @returns 
      */
-    getValue(attribute) {
-        switch (attribute) {
-            case "PRICE":
-                return (this.stockPrice === null) ? 0 : this.stockPrice;
+    static getInfo(symbol, attribute = "PRICE") {
+        const data = new StockAttributes();
+        const API_KEY = CacheFinanceWebSites.getApiKey("FINNHUB_API_KEY");
 
-            case "YIELDPCT":
-                return (this.yieldPct === null) ? 0 : this.yieldPct;
-
-            case "NAME":
-                return (this.stockName === null) ? "" : this.stockName;
-
-            default:
-                return '#N/A';
+        if (API_KEY === null) {
+            Logger.log("No FinnHub API Key.");
+            return data;
         }
+
+        if (attribute !== "PRICE") {
+            Logger.log("Finnhub.  Only PRICE is supported: " + symbol + ", " + attribute);
+            return data;
+        }
+
+        const countryCode = CacheFinanceWebSites.getTickerCountryCode(symbol);
+        if (countryCode !== "us") {
+            Logger.log("FinnHub --> Only U.S. stocks: " + symbol);
+            return data;
+        }
+
+        const URL = `https://finnhub.io/api/v1/quote?symbol=${FinnHub.getTicker(symbol)}&token=${API_KEY}`;
+        Logger.log(`getInfo:  ${symbol}`);
+        Logger.log(`URL = ${URL}`);
+
+        let jsonStr = null;
+        try {
+            jsonStr = UrlFetchApp.fetch(URL).getContentText();
+        }
+        catch (ex) {
+            return data;
+        }
+
+        const hubData = JSON.parse(jsonStr);
+        data.stockPrice = hubData.c;
+        Logger.log(hubData);
+
+        return data;
     }
 
     /**
-     * 
-     * @param {String} attribute 
-     * @returns {Boolean}
-     */
-    isAttributeSet(attribute) {
-        switch (attribute) {
-            case "PRICE":
-                return this.stockPrice !== null;
+    * 
+    * @param {String} symbol 
+    * @returns {String}
+    */
+    static getTicker(symbol) {
+        let modifiedSymbol = symbol;
+        const colon = symbol.indexOf(":");
 
-            case "YIELDPCT":
-                return this.yieldPct !== null;
+        if (colon >= 0) {
+            const symbolParts = symbol.split(":");
 
-            case "NAME":
-                return this.stockName !== null;
+            modifiedSymbol = symbolParts[1];
+            if (symbolParts[0] === "TSE")
+                modifiedSymbol = `${symbolParts[1]}.TO`;
 
-            default:
-                return false;
         }
+        return modifiedSymbol;
     }
 }
-
-
 
