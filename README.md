@@ -73,6 +73,12 @@
 # Using
 * After adding the script, it will require new permissions.
 * You need to open the script inside the Google Script editor, go to the Run menu and choose 'CacheFinanceBoot' from the dropdown. This will prompt you to authorize the script and the triggers will function with the correct permissions.
+* **Finnhub** 
+  * For faster U.S. stock price lookups when external finance data is used, add the key to **Apps Script** ==> **Project Settings** ==> **Script Properties**
+    * Click on **Edit Script Properties** ==> **Add Script Property**.  
+      * Set the property name to:  **FINNHUB_API_KEY**
+      * Set the value to:  *'YOUR FINNHUB API KEY'*
+        * Get your API key at:  https://finnhub.io/
 
 ## Using as a custom function.
 * The custom function **CACHEFINANCE** enhances the capabilities of GOOGLEFINANCE.
