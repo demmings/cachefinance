@@ -135,6 +135,11 @@ class CacheFinance {
         return CacheFinance.getFinanceValueFromLongCache(cacheKey);
     }
 
+    /**
+     * 
+     * @param {String} cacheKey 
+     * @returns {any}
+     */
     static getFinanceValueFromShortCache(cacheKey) {
         const shortCache = CacheService.getScriptCache();
 
@@ -154,6 +159,11 @@ class CacheFinance {
         return null;
     }
 
+    /**
+     * 
+     * @param {String} cacheKey 
+     * @returns {any}
+     */
     static getFinanceValueFromLongCache(cacheKey) {
         const longCache = new ScriptSettings();
 

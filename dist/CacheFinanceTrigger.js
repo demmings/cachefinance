@@ -120,6 +120,11 @@ class CacheFinance {
         return CacheFinance.getFinanceValueFromLongCache(cacheKey);
     }
 
+    /**
+     * 
+     * @param {String} cacheKey 
+     * @returns {any}
+     */
     static getFinanceValueFromShortCache(cacheKey) {
         const shortCache = CacheService.getScriptCache();
 
@@ -139,6 +144,11 @@ class CacheFinance {
         return null;
     }
 
+    /**
+     * 
+     * @param {String} cacheKey 
+     * @returns {any}
+     */
     static getFinanceValueFromLongCache(cacheKey) {
         const longCache = new ScriptSettings();
 
@@ -2478,8 +2488,8 @@ class AlphaVantage {
 
             const alphaVantageData = JSON.parse(jsonStr);
             data.stockPrice = alphaVantageData["Global Quote"]["05. price"];
-            Logger.log("content=" + jsonStr);
-            Logger.log("Price=" + data.stockPrice);
+            Logger.log(`content=${jsonStr}`);
+            Logger.log(`Price=${data.stockPrice}`);
         }
         catch (ex) {
             return data;

@@ -620,8 +620,8 @@ class AlphaVantage {
 
             const alphaVantageData = JSON.parse(jsonStr);
             data.stockPrice = alphaVantageData["Global Quote"]["05. price"];
-            Logger.log("content=" + jsonStr);
-            Logger.log("Price=" + data.stockPrice);
+            Logger.log(`content=${jsonStr}`);
+            Logger.log(`Price=${data.stockPrice}`);
         }
         catch (ex) {
             return data;
