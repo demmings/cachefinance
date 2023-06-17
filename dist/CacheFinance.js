@@ -29,6 +29,10 @@ function CACHEFINANCE(symbol, attribute = "price", googleFinanceValue = GOOGLEFI
         return '';
     }
 
+    if (typeof googleFinanceValue === 'string' && googleFinanceValue === '') {
+        googleFinanceValue = GOOGLEFINANCE_PARAM_NOT_USED;
+    }
+
     return CacheFinance.getFinanceData(symbol, attribute, googleFinanceValue);
 }
 
@@ -108,10 +112,18 @@ class CacheFinance {
      * @returns {any}
      */
     static getFinanceValueFromCache(cacheKey, useShortCacheOnly) {
-        const shortCache = CacheService.getScriptCache();
-        const longCache = new ScriptSettings();
+        const parsedData = CacheFinance.getFinanceValueFromShortCache(cacheKey);
+        if (parsedData !== null || useShortCacheOnly) {
+            return parsedData;
+        }
 
-        let data = shortCache.get(cacheKey);
+        return CacheFinance.getFinanceValueFromLongCache(cacheKey);
+    }
+
+    static getFinanceValueFromShortCache(cacheKey) {
+        const shortCache = CacheService.getScriptCache();
+
+        const data = shortCache.get(cacheKey);
 
         //  Set to null while testing.  Remove when all is working.
         // data = null;
@@ -119,14 +131,18 @@ class CacheFinance {
         if (data !== null && data !== "#ERROR!") {
             Logger.log(`Found in Short CACHE: ${cacheKey}. Value=${data}`);
             const parsedData = JSON.parse(data);
-            if (!(typeof parsedData === 'string' && parsedData === "#ERROR!"))
+            if (!(typeof parsedData === 'string' && (parsedData === "#ERROR!" || parsedData === ""))) {
                 return parsedData;
+            }
         }
 
-        if (useShortCacheOnly)
-            return null;
+        return null;
+    }
 
-        data = longCache.get(cacheKey);
+    static getFinanceValueFromLongCache(cacheKey) {
+        const longCache = new ScriptSettings();
+
+        const data = longCache.get(cacheKey);
         if (data !== null && data !== "#ERROR!") {
             Logger.log(`Long Term Cache.  Key=${cacheKey}. Value=${data}`);
             //  Long cache saves and returns same data type -so no conversion needed.
@@ -197,18 +213,34 @@ class CacheFinance {
      */
     static deleteFromCache(symbol, attribute) {
         const key = CacheFinance.makeCacheKey(symbol, attribute);
-
-        const shortCache = CacheService.getScriptCache();
-        const longCache = new ScriptSettings();   
         
-        const currentShortCacheValue = shortCache.get(key);
-        if (currentShortCacheValue !== null) {
-            shortCache.remove(key);
-        }
+        CacheFinance.deleteFromShortCache(key);
+        CacheFinance.deleteFromLongCache(key);
+    }
+
+    /**
+     * 
+     * @param {String} key 
+     */
+    static deleteFromLongCache(key) {
+        const longCache = new ScriptSettings();
 
         const currentLongCacheValue = longCache.get(key);
         if (currentLongCacheValue !== null) {
             longCache.delete(key);
+        }
+    }
+
+    /**
+     * 
+     * @param {String} key 
+     */
+    static deleteFromShortCache(key) {
+        const shortCache = CacheService.getScriptCache();
+
+        const currentShortCacheValue = shortCache.get(key);
+        if (currentShortCacheValue !== null) {
+            shortCache.remove(key);
         }
     }
 }
@@ -715,15 +747,12 @@ class CacheFinanceTest {
         this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "NYSEARCA:SHYG");
         this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:ZTL");
         this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:DFN-A");
-        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "ZTL", "ALL", "STOCK");
         this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:DFN-A", "ALL", "STOCK");
         this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "NASDAQ:MSFT", "ALL", "STOCK");
         this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:RY", "ALL", "STOCK");
 
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "NYSEARCA:SHYG");
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:FTN-A");
-        this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:HBF.B");
-        this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:MEG");
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:RY");
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "NASDAQ:MSFT");
 
@@ -964,6 +993,7 @@ class CacheFinanceWebSites {
     constructor() {
         this.siteList = [
             new FinanceWebSite("FinnHub", FinnHub),
+            new FinanceWebSite("AlphaVantage", AlphaVantage),
             new FinanceWebSite("TDEtf", TdMarketsEtf),
             new FinanceWebSite("TDStock", TdMarketsStock),
             new FinanceWebSite("Yahoo", YahooFinance),
@@ -1031,6 +1061,23 @@ class CacheFinanceWebSites {
         }
 
         return countryCode;
+    }
+
+    /**
+    * 
+    * @param {String} symbol 
+    * @returns {String}
+    */
+    static getBaseTicker(symbol) {
+        let modifiedSymbol = symbol;
+        const colon = symbol.indexOf(":");
+
+        if (colon >= 0) {
+            const symbolParts = symbol.split(":");
+
+            modifiedSymbol = symbolParts[1];
+        }
+        return modifiedSymbol;
     }
 
     /**
@@ -1483,43 +1530,72 @@ class FinnHub {
             return data;
         }
 
-        const URL = `https://finnhub.io/api/v1/quote?symbol=${FinnHub.getTicker(symbol)}&token=${API_KEY}`;
+        const URL = `https://finnhub.io/api/v1/quote?symbol=${CacheFinanceWebSites.getBaseTicker(symbol)}&token=${API_KEY}`;
         Logger.log(`getInfo:  ${symbol}`);
         Logger.log(`URL = ${URL}`);
 
         let jsonStr = null;
         try {
             jsonStr = UrlFetchApp.fetch(URL).getContentText();
+
+            const hubData = JSON.parse(jsonStr);
+            data.stockPrice = hubData.c;
+            Logger.log(hubData);
         }
         catch (ex) {
             return data;
         }
 
-        const hubData = JSON.parse(jsonStr);
-        data.stockPrice = hubData.c;
-        Logger.log(hubData);
-
         return data;
     }
+}
+
+class AlphaVantage {
 
     /**
-    * 
-    * @param {String} symbol 
-    * @returns {String}
-    */
-    static getTicker(symbol) {
-        let modifiedSymbol = symbol;
-        const colon = symbol.indexOf(":");
+     * 
+     * @param {String} symbol 
+     * @param {String} attribute 
+     * @returns 
+     */
+    static getInfo(symbol, attribute = "PRICE") {
+        const data = new StockAttributes();
+        const API_KEY = CacheFinanceWebSites.getApiKey("ALPHA_VANTAGE_API_KEY");
 
-        if (colon >= 0) {
-            const symbolParts = symbol.split(":");
-
-            modifiedSymbol = symbolParts[1];
-            if (symbolParts[0] === "TSE")
-                modifiedSymbol = `${symbolParts[1]}.TO`;
-
+        if (API_KEY === null) {
+            Logger.log("No AlphaVantage API Key.");
+            return data;
         }
-        return modifiedSymbol;
+
+        if (attribute !== "PRICE") {
+            Logger.log(`AlphaVantage.  Only PRICE is supported: ${symbol}, ${attribute}`);
+            return data;
+        }
+
+        const countryCode = CacheFinanceWebSites.getTickerCountryCode(symbol);
+        if (countryCode !== "us") {
+            Logger.log(`AlphaVantage --> Only U.S. stocks: ${symbol}`);
+            return data;
+        }
+
+        const URL = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${CacheFinanceWebSites.getBaseTicker(symbol)}&apikey=${API_KEY}`;
+        Logger.log(`getInfo:  ${symbol}`);
+        Logger.log(`URL = ${URL}`);
+
+        let jsonStr = null;
+        try {
+            jsonStr = UrlFetchApp.fetch(URL).getContentText();
+
+            const alphaVantageData = JSON.parse(jsonStr);
+            data.stockPrice = alphaVantageData["Global Quote"]["05. price"];
+            Logger.log("content=" + jsonStr);
+            Logger.log("Price=" + data.stockPrice);
+        }
+        catch (ex) {
+            return data;
+        }
+
+        return data;
     }
 }
 

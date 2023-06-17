@@ -25,6 +25,7 @@ class CacheFinanceWebSites {
     constructor() {
         this.siteList = [
             new FinanceWebSite("FinnHub", FinnHub),
+            new FinanceWebSite("AlphaVantage", AlphaVantage),
             new FinanceWebSite("TDEtf", TdMarketsEtf),
             new FinanceWebSite("TDStock", TdMarketsStock),
             new FinanceWebSite("Yahoo", YahooFinance),
@@ -92,6 +93,23 @@ class CacheFinanceWebSites {
         }
 
         return countryCode;
+    }
+
+    /**
+    * 
+    * @param {String} symbol 
+    * @returns {String}
+    */
+    static getBaseTicker(symbol) {
+        let modifiedSymbol = symbol;
+        const colon = symbol.indexOf(":");
+
+        if (colon >= 0) {
+            const symbolParts = symbol.split(":");
+
+            modifiedSymbol = symbolParts[1];
+        }
+        return modifiedSymbol;
     }
 
     /**
@@ -544,42 +562,71 @@ class FinnHub {
             return data;
         }
 
-        const URL = `https://finnhub.io/api/v1/quote?symbol=${FinnHub.getTicker(symbol)}&token=${API_KEY}`;
+        const URL = `https://finnhub.io/api/v1/quote?symbol=${CacheFinanceWebSites.getBaseTicker(symbol)}&token=${API_KEY}`;
         Logger.log(`getInfo:  ${symbol}`);
         Logger.log(`URL = ${URL}`);
 
         let jsonStr = null;
         try {
             jsonStr = UrlFetchApp.fetch(URL).getContentText();
+
+            const hubData = JSON.parse(jsonStr);
+            data.stockPrice = hubData.c;
+            Logger.log(hubData);
         }
         catch (ex) {
             return data;
         }
 
-        const hubData = JSON.parse(jsonStr);
-        data.stockPrice = hubData.c;
-        Logger.log(hubData);
-
         return data;
     }
+}
+
+class AlphaVantage {
 
     /**
-    * 
-    * @param {String} symbol 
-    * @returns {String}
-    */
-    static getTicker(symbol) {
-        let modifiedSymbol = symbol;
-        const colon = symbol.indexOf(":");
+     * 
+     * @param {String} symbol 
+     * @param {String} attribute 
+     * @returns 
+     */
+    static getInfo(symbol, attribute = "PRICE") {
+        const data = new StockAttributes();
+        const API_KEY = CacheFinanceWebSites.getApiKey("ALPHA_VANTAGE_API_KEY");
 
-        if (colon >= 0) {
-            const symbolParts = symbol.split(":");
-
-            modifiedSymbol = symbolParts[1];
-            if (symbolParts[0] === "TSE")
-                modifiedSymbol = `${symbolParts[1]}.TO`;
-
+        if (API_KEY === null) {
+            Logger.log("No AlphaVantage API Key.");
+            return data;
         }
-        return modifiedSymbol;
+
+        if (attribute !== "PRICE") {
+            Logger.log(`AlphaVantage.  Only PRICE is supported: ${symbol}, ${attribute}`);
+            return data;
+        }
+
+        const countryCode = CacheFinanceWebSites.getTickerCountryCode(symbol);
+        if (countryCode !== "us") {
+            Logger.log(`AlphaVantage --> Only U.S. stocks: ${symbol}`);
+            return data;
+        }
+
+        const URL = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${CacheFinanceWebSites.getBaseTicker(symbol)}&apikey=${API_KEY}`;
+        Logger.log(`getInfo:  ${symbol}`);
+        Logger.log(`URL = ${URL}`);
+
+        let jsonStr = null;
+        try {
+            jsonStr = UrlFetchApp.fetch(URL).getContentText();
+
+            const alphaVantageData = JSON.parse(jsonStr);
+            data.stockPrice = alphaVantageData["Global Quote"]["05. price"];
+            Logger.log("content=" + jsonStr);
+            Logger.log("Price=" + data.stockPrice);
+        }
+        catch (ex) {
+            return data;
+        }
+
+        return data;
     }
 }

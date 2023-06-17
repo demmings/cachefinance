@@ -44,6 +44,10 @@ function CACHEFINANCE(symbol, attribute = "price", googleFinanceValue = GOOGLEFI
         return '';
     }
 
+    if (typeof googleFinanceValue === 'string' && googleFinanceValue === '') {
+        googleFinanceValue = GOOGLEFINANCE_PARAM_NOT_USED;
+    }
+
     return CacheFinance.getFinanceData(symbol, attribute, googleFinanceValue);
 }
 
@@ -123,10 +127,18 @@ class CacheFinance {
      * @returns {any}
      */
     static getFinanceValueFromCache(cacheKey, useShortCacheOnly) {
-        const shortCache = CacheService.getScriptCache();
-        const longCache = new ScriptSettings();
+        const parsedData = CacheFinance.getFinanceValueFromShortCache(cacheKey);
+        if (parsedData !== null || useShortCacheOnly) {
+            return parsedData;
+        }
 
-        let data = shortCache.get(cacheKey);
+        return CacheFinance.getFinanceValueFromLongCache(cacheKey);
+    }
+
+    static getFinanceValueFromShortCache(cacheKey) {
+        const shortCache = CacheService.getScriptCache();
+
+        const data = shortCache.get(cacheKey);
 
         //  Set to null while testing.  Remove when all is working.
         // data = null;
@@ -134,14 +146,18 @@ class CacheFinance {
         if (data !== null && data !== "#ERROR!") {
             Logger.log(`Found in Short CACHE: ${cacheKey}. Value=${data}`);
             const parsedData = JSON.parse(data);
-            if (!(typeof parsedData === 'string' && parsedData === "#ERROR!"))
+            if (!(typeof parsedData === 'string' && (parsedData === "#ERROR!" || parsedData === ""))) {
                 return parsedData;
+            }
         }
 
-        if (useShortCacheOnly)
-            return null;
+        return null;
+    }
 
-        data = longCache.get(cacheKey);
+    static getFinanceValueFromLongCache(cacheKey) {
+        const longCache = new ScriptSettings();
+
+        const data = longCache.get(cacheKey);
         if (data !== null && data !== "#ERROR!") {
             Logger.log(`Long Term Cache.  Key=${cacheKey}. Value=${data}`);
             //  Long cache saves and returns same data type -so no conversion needed.
@@ -212,18 +228,34 @@ class CacheFinance {
      */
     static deleteFromCache(symbol, attribute) {
         const key = CacheFinance.makeCacheKey(symbol, attribute);
-
-        const shortCache = CacheService.getScriptCache();
-        const longCache = new ScriptSettings();   
         
-        const currentShortCacheValue = shortCache.get(key);
-        if (currentShortCacheValue !== null) {
-            shortCache.remove(key);
-        }
+        CacheFinance.deleteFromShortCache(key);
+        CacheFinance.deleteFromLongCache(key);
+    }
+
+    /**
+     * 
+     * @param {String} key 
+     */
+    static deleteFromLongCache(key) {
+        const longCache = new ScriptSettings();
 
         const currentLongCacheValue = longCache.get(key);
         if (currentLongCacheValue !== null) {
             longCache.delete(key);
+        }
+    }
+
+    /**
+     * 
+     * @param {String} key 
+     */
+    static deleteFromShortCache(key) {
+        const shortCache = CacheService.getScriptCache();
+
+        const currentShortCacheValue = shortCache.get(key);
+        if (currentShortCacheValue !== null) {
+            shortCache.remove(key);
         }
     }
 }
