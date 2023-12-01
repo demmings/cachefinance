@@ -5,6 +5,7 @@ import { ScriptSettings } from "./SQL/ScriptSettings.js";
 import { ThirdPartyFinance } from "./CacheFinance3rdParty.js";
 import { cacheFinanceTest } from "./CacheFinanceTest.js";
 import { StockAttributes } from "./CacheFinanceWebSites.js";
+import { CacheService } from "./GasMocks.js";
 export { CACHEFINANCE, CacheFinance };
 
 class Logger {
@@ -15,6 +16,10 @@ class Logger {
 //  *** DEBUG END ***/
 
 const GOOGLEFINANCE_PARAM_NOT_USED = "##NotSet##";
+
+function testYieldPct() {
+    let val = CACHEFINANCE("TSE:FTN-A", "yieldpct");
+}
 
 /**
  * Enhancement to GOOGLEFINANCE function for stock/ETF symbols that a) return "#N/A" (temporary or consistently), b) data never available like 'yieldpct' for ETF's. 
@@ -124,7 +129,7 @@ class CacheFinance {
      * 
      * @param {String} cacheKey 
      * @param {Boolean} useShortCacheOnly
-     * @returns {any}
+     * @returns {any} null if not found
      */
     static getFinanceValueFromCache(cacheKey, useShortCacheOnly) {
         const parsedData = CacheFinance.getFinanceValueFromShortCache(cacheKey);
@@ -135,6 +140,11 @@ class CacheFinance {
         return CacheFinance.getFinanceValueFromLongCache(cacheKey);
     }
 
+    /**
+     * 
+     * @param {String} cacheKey 
+     * @returns {any}
+     */
     static getFinanceValueFromShortCache(cacheKey) {
         const shortCache = CacheService.getScriptCache();
 
@@ -154,6 +164,11 @@ class CacheFinance {
         return null;
     }
 
+    /**
+     * 
+     * @param {String} cacheKey 
+     * @returns {any}
+     */
     static getFinanceValueFromLongCache(cacheKey) {
         const longCache = new ScriptSettings();
 
@@ -189,9 +204,10 @@ class CacheFinance {
      * @param {String} key 
      * @param {any} financialData 
      * @param {Number} shortCacheSeconds 
+     * @param {Number} longCacheDays
      * @returns {void}
      */
-    static saveFinanceValueToCache(key, financialData, shortCacheSeconds = 1200) {
+    static saveFinanceValueToCache(key, financialData, shortCacheSeconds = 1200, longCacheDays=7) {
         const shortCache = CacheService.getScriptCache();
         const longCache = new ScriptSettings();
         let start = new Date().getTime();
@@ -215,7 +231,7 @@ class CacheFinance {
        
         //  For emergency cases when GOOGLEFINANCE is down long term...
         start = new Date().getTime();
-        longCache.put(key, financialData, 7);
+        longCache.put(key, financialData, longCacheDays);
         const longMs = new Date().getTime() - start;
 
         Logger.log(`SET GoogleFinance VALUE Long/Short Cache. Key=${key}.  Value=${financialData}. Short ms=${shortMs}. Long ms=${longMs}`);

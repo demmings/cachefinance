@@ -1,7 +1,7 @@
 /*  *** DEBUG START ***
 //  Remove comments for testing in NODE
 
-export { CacheFinanceWebSites };
+export { FinanceWebSites };
 export { StockAttributes };
 export { FinanceWebSite };
 export { TdMarketResearch, GlobeAndMail, YahooFinance, FinnHub };
@@ -14,13 +14,14 @@ class Logger {
 //  *** DEBUG END ***/
 
 /**
- * @classdesc Finance Website Info.
+ * @classdesc Concrete implementations for each finance website access.
  */
-class CacheFinanceWebSites {
+class FinanceWebSites {
     /**
      * All finance website lookup objects should be defined here.
-     * All finance Website Objects must implement the method "getInfo(symbol)"
+     * All finance Website Objects must implement the method "getInfo(symbol)" and getPropertyValue(key)
      * The getInfo() method must return an instance of "StockAttributes"
+     * The getPropertyValue() is used to query any possible properties known (and unknown future) about the website.
      */
     constructor() {
         this.siteList = [
@@ -35,7 +36,7 @@ class CacheFinanceWebSites {
         /** @property {Map<String, FinanceWebSite>} */
         this.siteMap = new Map();
         for (const site of this.siteList) {
-            this.siteMap.set(site.siteName, site.siteObject);
+            this.siteMap.set(site.siteName, site);
         }
     }
 
@@ -53,7 +54,7 @@ class CacheFinanceWebSites {
      * @returns {FinanceWebSite}
      */
     getByName(name) {
-        const siteInfo = this.siteMap.get(name);
+        const siteInfo = this.siteMap.get(name.toUpperCase());
 
         return (typeof siteInfo === 'undefined') ? null : siteInfo;
     }
@@ -133,11 +134,11 @@ class FinanceWebSite {
     /**
      * 
      * @param {String} siteName 
-     * @param {object} siteObject - Points to class for getting finance data.
+     * @param {object} webSiteJsClass - Points to class for getting finance data.
      */
-    constructor(siteName, siteObject) {
-        this.siteName = siteName;
-        this.siteObject = siteObject;
+    constructor(siteName, webSiteJsClass) {
+        this.siteName = siteName.toUpperCase();
+        this.siteObject = webSiteJsClass;
     }
 
     set siteName(siteName) {
@@ -147,10 +148,10 @@ class FinanceWebSite {
         return this._siteName;
     }
 
-    set siteObject(siteObject) {
+    set webSiteClass(siteObject) {
         this._siteObject = siteObject;
     }
-    get siteObject() {
+    get webSiteClass() {
         return this._siteObject;
     }
 }
@@ -246,6 +247,16 @@ class TdMarketsEtf {
     static getInfo(symbol, attribute) {
         return TdMarketResearch.getInfo(symbol, attribute, "ETF");
     }
+
+    /**
+     * 
+     * @param {String} key 
+     * @param {any} defaultValue 
+     * @returns {any}
+     */
+    static getPropertyValue(key, defaultValue) {
+        return defaultValue;
+    }
 }
 
 /**
@@ -260,6 +271,16 @@ class TdMarketsStock {
      */
     static getInfo(symbol, attribute) {
         return TdMarketResearch.getInfo(symbol, attribute, "STOCK");
+    }
+
+    /**
+     * 
+     * @param {String} key 
+     * @param {any} defaultValue 
+     * @returns {any}
+     */
+    static getPropertyValue(key, defaultValue) {
+        return defaultValue;
     }
 }
 
@@ -279,9 +300,9 @@ class TdMarketResearch {
 
         let URL = null;
         if (type === "ETF")
-            URL = `https://marketsandresearch.td.com/tdwca/Public/ETFsProfile/Summary/${CacheFinanceWebSites.getTickerCountryCode(symbol)}/${TdMarketResearch.getTicker(symbol)}`;
+            URL = `https://marketsandresearch.td.com/tdwca/Public/ETFsProfile/Summary/${FinanceWebSites.getTickerCountryCode(symbol)}/${TdMarketResearch.getTicker(symbol)}`;
         else
-            URL = `https://marketsandresearch.td.com/tdwca/Public/Stocks/Overview/${CacheFinanceWebSites.getTickerCountryCode(symbol)}/${TdMarketResearch.getTicker(symbol)}`;
+            URL = `https://marketsandresearch.td.com/tdwca/Public/Stocks/Overview/${FinanceWebSites.getTickerCountryCode(symbol)}/${TdMarketResearch.getTicker(symbol)}`;
 
         let html = null;
         try {
@@ -410,6 +431,10 @@ class YahooFinance {
         return data;
     }
 
+    static getPropertyValue(key, defaultValue) {
+        return defaultValue;
+    }
+
     /**
      * 
      * @param {String} symbol 
@@ -490,6 +515,10 @@ class GlobeAndMail {
         return data;
     }
 
+    static getPropertyValue(key, defaultValue) {
+        return defaultValue;
+    }
+
     /**
      * Clean up ticker symbol for use in Globe and Mail lookups.
      * @param {String} symbol 
@@ -544,7 +573,7 @@ class FinnHub {
      */
     static getInfo(symbol, attribute = "PRICE") {
         const data = new StockAttributes();
-        const API_KEY = CacheFinanceWebSites.getApiKey("FINNHUB_API_KEY");
+        const API_KEY = FinanceWebSites.getApiKey("FINNHUB_API_KEY");
 
         if (API_KEY === null) {
             Logger.log("No FinnHub API Key.");
@@ -556,13 +585,13 @@ class FinnHub {
             return data;
         }
 
-        const countryCode = CacheFinanceWebSites.getTickerCountryCode(symbol);
+        const countryCode = FinanceWebSites.getTickerCountryCode(symbol);
         if (countryCode !== "us") {
             Logger.log(`FinnHub --> Only U.S. stocks: ${symbol}`);
             return data;
         }
 
-        const URL = `https://finnhub.io/api/v1/quote?symbol=${CacheFinanceWebSites.getBaseTicker(symbol)}&token=${API_KEY}`;
+        const URL = `https://finnhub.io/api/v1/quote?symbol=${FinanceWebSites.getBaseTicker(symbol)}&token=${API_KEY}`;
         Logger.log(`getInfo:  ${symbol}`);
         Logger.log(`URL = ${URL}`);
 
@@ -580,6 +609,10 @@ class FinnHub {
 
         return data;
     }
+
+    static getPropertyValue(key, defaultValue) {
+        return defaultValue;
+    }
 }
 
 class AlphaVantage {
@@ -592,7 +625,7 @@ class AlphaVantage {
      */
     static getInfo(symbol, attribute = "PRICE") {
         const data = new StockAttributes();
-        const API_KEY = CacheFinanceWebSites.getApiKey("ALPHA_VANTAGE_API_KEY");
+        const API_KEY = FinanceWebSites.getApiKey("ALPHA_VANTAGE_API_KEY");
 
         if (API_KEY === null) {
             Logger.log("No AlphaVantage API Key.");
@@ -604,13 +637,13 @@ class AlphaVantage {
             return data;
         }
 
-        const countryCode = CacheFinanceWebSites.getTickerCountryCode(symbol);
+        const countryCode = FinanceWebSites.getTickerCountryCode(symbol);
         if (countryCode !== "us") {
             Logger.log(`AlphaVantage --> Only U.S. stocks: ${symbol}`);
             return data;
         }
 
-        const URL = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${CacheFinanceWebSites.getBaseTicker(symbol)}&apikey=${API_KEY}`;
+        const URL = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${FinanceWebSites.getBaseTicker(symbol)}&apikey=${API_KEY}`;
         Logger.log(`getInfo:  ${symbol}`);
         Logger.log(`URL = ${URL}`);
 
@@ -620,13 +653,17 @@ class AlphaVantage {
 
             const alphaVantageData = JSON.parse(jsonStr);
             data.stockPrice = alphaVantageData["Global Quote"]["05. price"];
-            Logger.log("content=" + jsonStr);
-            Logger.log("Price=" + data.stockPrice);
+            Logger.log(`content=${jsonStr}`);
+            Logger.log(`Price=${data.stockPrice}`);
         }
         catch (ex) {
             return data;
         }
 
         return data;
+    }
+
+    static getPropertyValue(key, defaultValue) {
+        return defaultValue;
     }
 }

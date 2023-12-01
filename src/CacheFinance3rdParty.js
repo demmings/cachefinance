@@ -2,7 +2,7 @@
 //  Remove comments for testing in NODE
 
 import { ScriptSettings } from "./SQL/ScriptSettings.js";
-import { CacheFinanceWebSites, StockAttributes, FinanceWebSite } from "./CacheFinanceWebSites.js";
+import { FinanceWebSites, StockAttributes, FinanceWebSite } from "./CacheFinanceWebSites.js";
 export { ThirdPartyFinance, FinanceWebsiteSearch };
 
 class Logger {
@@ -35,7 +35,7 @@ class ThirdPartyFinance {                   //  skipcq: JS-0128
  */
 class FinanceWebsiteSearch {
     constructor() {
-        const siteInfo = new CacheFinanceWebSites();
+        const siteInfo = new FinanceWebSites();
 
         /** @type {FinanceWebSite[]} */
         this.financeSiteList = siteInfo.get();
@@ -256,15 +256,13 @@ class FinanceSiteLookupAnalyzer {
         return attributes;
     }
 
-
     /**
      * 
      * @param {FinanceSiteList} stockSites 
      * @param {String} attribute 
-     * @returns 
+     * @returns {StockAttributes}
      */
     static getStockAttribute(stockSites, attribute) {
-        let data = new StockAttributes();
         let siteArr = [];
 
         switch (attribute) {
@@ -284,18 +282,41 @@ class FinanceSiteLookupAnalyzer {
                 siteArr = stockSites.priceSites;
                 break;
         }
+        
+        return FinanceSiteLookupAnalyzer.getAttributeDataFromSite(stockSites.symbol, siteArr, attribute);
+    }
 
-        const sitesSearchFunction = new CacheFinanceWebSites();
+    /**
+     * 
+     * @param {String} symbol 
+     * @param {String[]} siteArr 
+     * @param {String} attribute 
+     * @returns {StockAttributes}
+     */
+    static getAttributeDataFromSite(symbol, siteArr, attribute) {
+        let data = new StockAttributes();
+
+        const sitesSearchFunction = new FinanceWebSites();
         for (const site of siteArr) {
             const siteFunction = sitesSearchFunction.getByName(site);
-            data = siteFunction.getInfo(stockSites.symbol, attribute);
+            if (siteFunction === null) {
+                Logger.log(`Invalid site=${site}`);
+                continue
+            }
 
-            if (data !== null && data.isAttributeSet(attribute)) {
+            try {
+              data = siteFunction.siteObject.getInfo(symbol, attribute);
+            }
+            catch(ex) {
+              Logger.log("No SITE Object.  Symbol=" + symbol + ". Attrib=" + attribute + ". Site=" + site);
+            }            
+
+            if (data?.isAttributeSet(attribute)) {
                 return data;
             }
         }  
         
-        return data;
+        return data;        
     }
 }
 

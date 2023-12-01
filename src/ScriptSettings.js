@@ -1,7 +1,7 @@
 /*  *** DEBUG START ***
 //  Remove comments for testing in NODE
 export { ScriptSettings };
-import { PropertiesService } from "./SqlTest.js";
+import { PropertiesService } from "../GasMocks.js";
 //  *** DEBUG END ***/
 
 /** @classdesc 
