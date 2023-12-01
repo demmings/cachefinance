@@ -17,8 +17,10 @@ class Logger {
 
 const GOOGLEFINANCE_PARAM_NOT_USED = "##NotSet##";
 
+//  Function only used for testing in google sheets app script.
+// skipcq: JS-0128
 function testYieldPct() {
-    let val = CACHEFINANCE("TSE:FTN-A", "yieldpct");
+    const val = CACHEFINANCE("TSE:FTN-A", "yieldpct");        // skipcq: JS-0128
 }
 
 /**

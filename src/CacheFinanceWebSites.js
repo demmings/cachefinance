@@ -431,6 +431,12 @@ class YahooFinance {
         return data;
     }
 
+    /**
+     * 
+     * @param {String} key 
+     * @param {any} defaultValue 
+     * @returns {any}
+     */
     static getPropertyValue(key, defaultValue) {
         return defaultValue;
     }
@@ -515,6 +521,12 @@ class GlobeAndMail {
         return data;
     }
 
+    /**
+     * 
+     * @param {String} key 
+     * @param {any} defaultValue 
+     * @returns {any}
+     */
     static getPropertyValue(key, defaultValue) {
         return defaultValue;
     }
@@ -610,6 +622,12 @@ class FinnHub {
         return data;
     }
 
+    /**
+     * 
+     * @param {String} key 
+     * @param {any} defaultValue 
+     * @returns {any}
+     */
     static getPropertyValue(key, defaultValue) {
         return defaultValue;
     }
@@ -663,6 +681,12 @@ class AlphaVantage {
         return data;
     }
 
+    /**
+     * 
+     * @param {String} key 
+     * @param {any} defaultValue 
+     * @returns {any}
+     */
     static getPropertyValue(key, defaultValue) {
         return defaultValue;
     }

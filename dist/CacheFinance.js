@@ -1,8 +1,10 @@
 
 const GOOGLEFINANCE_PARAM_NOT_USED = "##NotSet##";
 
+//  Function only used for testing in google sheets app script.
+// skipcq: JS-0128
 function testYieldPct() {
-    let val = CACHEFINANCE("TSE:FTN-A", "yieldpct");
+    const val = CACHEFINANCE("TSE:FTN-A", "yieldpct");        // skipcq: JS-0128
 }
 
 /**
@@ -1435,6 +1437,12 @@ class YahooFinance {
         return data;
     }
 
+    /**
+     * 
+     * @param {String} key 
+     * @param {any} defaultValue 
+     * @returns {any}
+     */
     static getPropertyValue(key, defaultValue) {
         return defaultValue;
     }
@@ -1519,6 +1527,12 @@ class GlobeAndMail {
         return data;
     }
 
+    /**
+     * 
+     * @param {String} key 
+     * @param {any} defaultValue 
+     * @returns {any}
+     */
     static getPropertyValue(key, defaultValue) {
         return defaultValue;
     }
@@ -1614,6 +1628,12 @@ class FinnHub {
         return data;
     }
 
+    /**
+     * 
+     * @param {String} key 
+     * @param {any} defaultValue 
+     * @returns {any}
+     */
     static getPropertyValue(key, defaultValue) {
         return defaultValue;
     }
@@ -1667,6 +1687,12 @@ class AlphaVantage {
         return data;
     }
 
+    /**
+     * 
+     * @param {String} key 
+     * @param {any} defaultValue 
+     * @returns {any}
+     */
     static getPropertyValue(key, defaultValue) {
         return defaultValue;
     }
