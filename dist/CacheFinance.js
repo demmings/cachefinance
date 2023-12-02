@@ -704,7 +704,7 @@ class FinanceSiteLookupAnalyzer {
               data = siteFunction.siteObject.getInfo(symbol, attribute);
             }
             catch(ex) {
-              Logger.log("No SITE Object.  Symbol=" + symbol + ". Attrib=" + attribute + ". Site=" + site);
+              Logger.log(`No SITE Object.  Symbol=${symbol}. Attrib=${attribute}. Site=${site}`);
             }            
 
             if (data?.isAttributeSet(attribute)) {
