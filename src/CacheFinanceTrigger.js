@@ -152,7 +152,7 @@ class CacheJobSettings {
         this.load(jobInfo);
 
         CacheJobSettings.deleteOldTrigger(jobInfo.triggerID);       //  Delete myself
-        jobInfo.triggerID = "";                         
+        jobInfo.triggerID = "";
         CacheJobSettings.cleanupDisabledTriggers();                 //  Delete triggers that ran, but not cleaned up.    
         this.validateTriggerIDs();
         this.createMissingTriggers(false);
@@ -191,10 +191,8 @@ class CacheJobSettings {
         if (alive) {
             shortCache.put(key, "ALIVE");
         }
-        else {
-            if (shortCache.get(key) !== null) {
-                shortCache.remove(key);
-            }
+        else if (shortCache.get(key) !== null) {
+            shortCache.remove(key);
         }
     }
 
@@ -574,7 +572,7 @@ class CacheJob {
         }
 
         for (let i = 0; i < 24; i++)
-            this.hourNumbers[i] = (this.hours === '*') ? true : false;
+            this.hourNumbers[i] = this.hours === '*';
 
         if (this.hours === '*')
             return;

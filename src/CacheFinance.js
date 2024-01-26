@@ -21,6 +21,7 @@ const GOOGLEFINANCE_PARAM_NOT_USED = "##NotSet##";
 // skipcq: JS-0128
 function testYieldPct() {
     const val = CACHEFINANCE("TSE:FTN-A", "yieldpct");        // skipcq: JS-0128
+    Logger.log(`Test CacheFinance FTN-A(yieldpct)=${val}`);
 }
 
 /**
