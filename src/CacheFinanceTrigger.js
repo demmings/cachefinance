@@ -10,7 +10,10 @@ class Logger {
 }
 //  *** DEBUG END ***/
 
-function testCacheTriggerJob() {
+/**
+ * Run test manually within Sheets.
+ */
+function testCacheTriggerJob() {                // skipcq: JS-0128
     const jobParms = ["Stocks!A8:A140",
         "PRICE",
         "Stocks!C8:C140",
@@ -27,7 +30,7 @@ function testCacheTriggerJob() {
 /**
  * Run test manually within Sheets.
  */
-function testBulkCache() {
+function testBulkCache() {                      // skipcq: JS-0128
     const symbols = [["ABC"], ["DEF"], ["GHI"], ["JKL"], ["MNO"]];
     const data = [11.1, 22.2, 33.3, 44.4, 55.5];
 
