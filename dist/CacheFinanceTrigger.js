@@ -43,7 +43,6 @@ function CACHEFINANCE(symbol, attribute = "price", googleFinanceValue = GOOGLEFI
     return CacheFinance.getFinanceData(symbol, attribute, googleFinanceValue);
 }
 
-
 /**
  * @classdesc GOOGLEFINANCE helper function.  Returns default value (if available) and set this value to cache OR
  * reads from short term cache (<21600s) and returns value OR
@@ -56,9 +55,10 @@ class CacheFinance {
      * @param {string} symbol 
      * @param {string} attribute - ["price", "yieldpct", "name"] 
      * @param {any} googleFinanceValue - Optional.  Use GOOGLEFINANCE() to get value, if '#N/A' will read cache.
+     * @param {any} valueFromCache - optional - value previously read from cache.
      * @returns {any}
      */
-    static getFinanceData(symbol, attribute, googleFinanceValue) {
+    static getFinanceData(symbol, attribute, googleFinanceValue, valueFromCache=null) {
         attribute = attribute.toUpperCase().trim();
         symbol = symbol.toUpperCase();
         const cacheKey = CacheFinance.makeCacheKey(symbol, attribute);
@@ -68,7 +68,7 @@ class CacheFinance {
             //  We cache here longer because we would normally be getting data from Google.
             //  If GoogleFinance is failing, we need the data to be held longer since it
             //  it is getting from cache as an emergency backup.
-            CacheFinance.saveFinanceValueToCache(cacheKey, googleFinanceValue, 21600);
+            CacheFinance.saveFinanceValueToCache(cacheKey, googleFinanceValue, 21600, valueFromCache);
             return googleFinanceValue;
         }
 
@@ -191,37 +191,64 @@ class CacheFinance {
      * @param {String} key 
      * @param {any} financialData 
      * @param {Number} shortCacheSeconds 
-     * @param {Number} longCacheDays
+     * @param {any} currentShortCacheValue
      * @returns {void}
      */
-    static saveFinanceValueToCache(key, financialData, shortCacheSeconds = 1200, longCacheDays=7) {
+    static saveFinanceValueToCache(key, financialData, shortCacheSeconds = 1200, currentShortCacheValue=null) {
         const shortCache = CacheService.getScriptCache();
-        const longCache = new ScriptSettings();
-        let start = new Date().getTime();
-
-        const currentShortCacheValue = shortCache.get(key);
-        if (currentShortCacheValue !== null && JSON.parse(currentShortCacheValue) === financialData) {
-            Logger.log(`GoogleFinance VALUE.  No Change in SHORT Cache. ms=${new Date().getTime() - start}`);
-            return;
+        if (currentShortCacheValue === null) {
+            currentShortCacheValue = shortCache.get(key);
         }
+        const longCacheDays = 7;
 
-        if (currentShortCacheValue !== null) {
-            Logger.log(`Short Cache Changed.  Old=${JSON.parse(currentShortCacheValue)} . New=${financialData}`);
+        if (! CacheFinance.isTimeToUpdateCache(currentShortCacheValue, financialData)) {
+            return;
         }
    
         //  If we normally get the price from Google, we want to cache for a longer
         //  time because the only time we need a price for this particular stock
         //  is when GOOGLEFINANCE fails.
-        start = new Date().getTime();
+        let start = new Date().getTime();
         shortCache.put(key, JSON.stringify(financialData), shortCacheSeconds);
         const shortMs = new Date().getTime() - start;
        
         //  For emergency cases when GOOGLEFINANCE is down long term...
         start = new Date().getTime();
+        const longCache = new ScriptSettings();
         longCache.put(key, financialData, longCacheDays);
         const longMs = new Date().getTime() - start;
 
         Logger.log(`SET GoogleFinance VALUE Long/Short Cache. Key=${key}.  Value=${financialData}. Short ms=${shortMs}. Long ms=${longMs}`);
+    }
+
+    /**
+     * 
+     * @param {String} currentShortCacheValue 
+     * @param {any} financialData 
+     * @returns {Boolean}
+     */
+    static isTimeToUpdateCache(currentShortCacheValue, financialData) {
+        if (currentShortCacheValue !== null) {
+            const oldData = JSON.parse(currentShortCacheValue);
+
+            if (oldData === financialData) {
+                Logger.log("GoogleFinance VALUE.  No Change in SHORT Cache.");
+                return false;
+            }
+
+            if (oldData > 0 && financialData > 0) {
+                const changeInPrice =  oldData - financialData;
+                const percentChange = Math.abs(changeInPrice / oldData);
+                if (percentChange < 0.0025) {
+                    Logger.log(`Short Cache Changed very little.  Old=${oldData} . New=${financialData}`);
+                    return false;
+                }
+            }
+
+            Logger.log(`Short Cache Changed.  Old=${oldData} . New=${financialData}`);
+        }
+
+        return true;
     }
 
     /**
@@ -261,6 +288,34 @@ class CacheFinance {
             shortCache.remove(key);
         }
     }
+}
+
+function testCacheTriggerJob() {
+    const jobParms = ["Stocks!A8:A140",
+        "PRICE",
+        "Stocks!C8:C140",
+        "Stocks!CB8:CB140",
+        1,
+        "*",
+        "MON-SUN",
+        ""];
+
+    const jobSettings = new CacheJob(jobParms);
+    CacheTrigger.getJobData(jobSettings);
+}
+
+function testBulkCache() {
+    const symbols = [["ABC"], ["DEF"], ["GHI"], ["JKL"], ["MNO"]];
+    const data = [11.1, 22.2, 33.3, 44.4, 55.5];
+
+    CacheTrigger.bulkCachePut(symbols, "PRICE", data);
+    const cacheData = CacheTrigger.bulkCacheGet(symbols, "PRICE");
+
+    if (JSON.stringify(data) !== JSON.stringify(cacheData)) {
+        Logger.log("BULK Cache TEST Fail.");
+    }
+
+    Logger.log("BULK CACHE TEST Success");
 }
 
 //  Named range in sheet with CacheFinance configurations.
@@ -658,6 +713,8 @@ class CacheJob {
         this.hourNumbers = [];
         this.jobData = null;
         this.wasRestarted = false;
+        this.maxRunSeconds = 0;
+        this.startJobTime = null;
 
         Logger.log(`Job Settings:  symbols=${this.symbolRange}. attribute=${this.attribute}. Out=${this.outputRange}. In=${this.defaultRange}. Minutes=${this.refreshMinutes}. Hours=${this.hours}. Days=${this.days}`);
 
@@ -701,6 +758,38 @@ class CacheJob {
      */
     isRestarting() {
         return this.wasRestarted;
+    }
+
+    /**
+     * @param {Number} maxRunSeconds
+     * @returns {any[]}
+     */
+    startJobRunTimer(maxRunSeconds) {
+        let data = [];
+        if (this.isRestarting()) {
+            data = this.jobData;
+        }
+
+        this.timedOut(false);
+        this.maxRunSeconds = maxRunSeconds;
+        this.startJobTime = new Date().getTime();
+
+        return data;
+    }
+
+    /**
+     * 
+     * @returns {Boolean}
+     */
+    hasExceededJobRunTime() {
+        const elapsed = (new Date().getTime() - this.startJobTime) / 1000;
+        if (elapsed > this.maxRunSeconds) {
+            Logger.log("Max. Job Time reached.");
+            this.timedOut(true);
+            return true;
+        }
+
+        return false;
     }
 
     /**
@@ -1056,68 +1145,86 @@ class CacheTrigger {
 
     /**
      * 
-     * @param {CacheJob} jobSettings 
+     * @param {CacheJob} jobSettings - results also returned in object.
      * @returns {void}
      */
     static getJobData(jobSettings) {
         const MAX_RUN_SECONDS = 300;
-        let data = [];
-        const symbolsNamedRange = SpreadsheetApp.getActiveSpreadsheet().getRangeByName(jobSettings.symbolRange);
-        let googleValuesNamedRange = null;
-        if (jobSettings.defaultRange !== "") {
-            googleValuesNamedRange = SpreadsheetApp.getActiveSpreadsheet().getRangeByName(jobSettings.defaultRange);
-        }
+        const attribute = jobSettings.attribute;
+        const symbols = CacheTrigger.getSymbols(jobSettings);
+        const defaultData = CacheTrigger.getDefaultData(jobSettings);
+        const bulkDataCache = CacheTrigger.bulkCacheGet(symbols, attribute);
 
         Logger.log(`CacheTrigger: Symbols:${jobSettings.symbolRange}. Attribute:${jobSettings.attribute}. GoogleRange: ${jobSettings.defaultRange}`);
 
-        if (symbolsNamedRange === null || (jobSettings.defaultRange !== "" && googleValuesNamedRange === null)) {
-            Logger.log("Failed to read data from range.");
-            return;
+        if (CacheTrigger.isDefaultDataProvided(jobSettings) && symbols.length !== defaultData.length) {
+            throw new Error(`Symbol Ranges and Google Values Ranges must be the same: ${jobSettings.symbolRange}. Len=${symbols.length}.  GoogleValues: ${jobSettings.defaultRange}. Len=${defaultData.length}`);
         }
 
-        const symbols = symbolsNamedRange.getValues();
-        let defaultData = [];
-        if (googleValuesNamedRange !== null) {
-            defaultData = googleValuesNamedRange.getValues();
-        }
-
-        const attribute = jobSettings.attribute;
-
-        if (googleValuesNamedRange !== null && symbols.length !== defaultData.length) {
-            Logger.log(`Symbol Ranges and Google Values Ranges must be the same: ${jobSettings.symbolRange}. Len=${symbols.length}.  GoogleValues: ${jobSettings.defaultRange}. Len=${defaultData.length}`);
-            return;
-        }
-
-        jobSettings.timedOut(false);
-
-        let startingSymbol = 0;
-        if (jobSettings.isRestarting()) {
-            data = jobSettings.jobData;
-            startingSymbol = data.length;
-        }
-
-        const start = new Date().getTime();
+        //  Start job timer and load previously loaded (and not finished) job data.
+        let data = jobSettings.startJobRunTimer(MAX_RUN_SECONDS);
+        let startingSymbol = data.length;
 
         for (let i = startingSymbol; i < symbols.length; i++) {
-            const elapsed = (new Date().getTime() - start) / 1000;
-            if (elapsed > MAX_RUN_SECONDS) {
-                Logger.log("Max. Job Time reached.");
-                jobSettings.timedOut(true);
+            if (jobSettings.hasExceededJobRunTime()) {
                 break;
             }
 
             let value = null;
-            if (googleValuesNamedRange === null) {
-                value = CACHEFINANCE(symbols[i][0], attribute);
+            if (CacheTrigger.isDefaultDataProvided(jobSettings)) {
+                value = CacheFinance.getFinanceData(symbols[i][0], attribute, defaultData[i][0], bulkDataCache[i]);
             }
             else {
-                value = CACHEFINANCE(symbols[i][0], attribute, defaultData[i][0]);
+                value = CacheFinance.getFinanceData(symbols[i][0], attribute, GOOGLEFINANCE_PARAM_NOT_USED);
             }
 
             data.push([value]);
         }
 
         jobSettings.save(data);
+    }
+
+    /**
+     * 
+     * @param {CacheJob} jobSettings 
+     * @returns {any[][]}
+     */
+    static getSymbols(jobSettings) {
+        const symbolsNamedRange = SpreadsheetApp.getActiveSpreadsheet().getRangeByName(jobSettings.symbolRange);
+        if (symbolsNamedRange === null) {
+            throw new Error(`Failed to read data from SYMBOLS range =${jobSettings.symbolRange}`);
+        }
+
+        return symbolsNamedRange.getValues();
+    }
+
+    /**
+     * 
+     * @param {CacheJob} jobSettings 
+     * @returns {any[][]}
+     */
+    static getDefaultData(jobSettings) {
+        let defaultData = [];
+
+        if (jobSettings.defaultRange !== "") {
+            const symbolsNamedRange = SpreadsheetApp.getActiveSpreadsheet().getRangeByName(jobSettings.defaultRange);
+            if (symbolsNamedRange === null) {
+                throw new Error(`Failed to read data from DEFAULT DATA range =${jobSettings.defaultRange}`);
+            }
+
+            defaultData = symbolsNamedRange.getValues();
+        }
+
+        return defaultData;
+    }
+
+    /**
+     * 
+     * @param {CacheJob} jobSettings 
+     * @returns {Boolean}
+     */
+    static isDefaultDataProvided(jobSettings) {
+        return jobSettings.defaultRange !== "";
     }
 
     /**
@@ -1147,6 +1254,85 @@ class CacheTrigger {
 
         Logger.log(`writeCacheResults:  END: ${jobSettings.outputRange}`);
         return true;
+    }
+
+    /**
+     * 
+     * @param {any[][]} symbols 
+     * @param {String} attribute 
+     * @returns {any[]} 
+     */
+    static bulkCacheGet(symbols, attribute) {
+        const cacheKeyList = CacheTrigger.createCacheKeyList(symbols, attribute);
+        return CacheTrigger.getFinanceValuesFromShortCache(cacheKeyList);
+    }
+
+    /**
+     * 
+     * @param {any[][]} symbols 
+     * @param {String} attribute 
+     * @param {any[]} newCacheData 
+     */
+    static bulkCachePut(symbols, attribute, newCacheData) {
+        const cacheKeyList = CacheTrigger.createCacheKeyList(symbols, attribute);
+        CacheTrigger.putFinanceValuesIntoShortCache(cacheKeyList, newCacheData);
+    }
+
+    /**
+     * 
+     * @param {any[][]} symbols 
+     * @param {String} attribute 
+     * @returns {any[]}
+     */
+    static createCacheKeyList(symbols, attribute) {
+        const cacheKeyList = [];
+        for (let symbol of symbols) {
+            attribute = attribute.toUpperCase().trim();
+            const upperCaseSymbol = symbol[0].toUpperCase();
+            const cacheKey = CacheFinance.makeCacheKey(upperCaseSymbol, attribute.toUpperCase().trim());
+            cacheKeyList.push(cacheKey);
+        }
+
+        return cacheKeyList;
+    }
+
+    /**
+     * 
+     * @param {String[]} cacheKeys 
+     * @returns {any[]}
+     */
+    static getFinanceValuesFromShortCache(cacheKeys) {
+        const shortCache = CacheService.getScriptCache();
+
+        //  Object with key/value pairs for all items found in cache.
+        const data = shortCache.getAll(cacheKeys);
+        const cachedDataList = [];
+
+        for (let key of cacheKeys) {
+            let parsedData = null;
+            if (typeof data[key] !== 'undefined') {
+                parsedData = JSON.parse(data[key]);
+            }
+            cachedDataList.push(parsedData);
+        }
+
+        return cachedDataList;
+    }
+
+    /**
+     * Puts list of data into cache using one API call.  Data is converted to JSON before it is updated.
+     * @param {String[]} cacheKeys 
+     * @param {any[]} newCacheData 
+     */
+    static putFinanceValuesIntoShortCache(cacheKeys, newCacheData) {
+        const bulkData = {};
+
+        for (let i = 0; i < cacheKeys.length; i++) {
+            bulkData[cacheKeys[i]] = JSON.stringify(newCacheData[i]);
+        }
+
+        const shortCache = CacheService.getScriptCache();
+        shortCache.putAll(bulkData, 21600);
     }
 }
 
@@ -1250,7 +1436,9 @@ class ScriptSettings {      //  skipcq: JS-0128
     }
 }
 
-/** Converts data into JSON for getting/setting in ScriptSettings. */
+/**
+ * @classdesc Converts data into JSON for getting/setting in ScriptSettings.
+ */
 class PropertyData {
     /**
      * 

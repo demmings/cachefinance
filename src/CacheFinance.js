@@ -6,7 +6,7 @@ import { ThirdPartyFinance } from "./CacheFinance3rdParty.js";
 import { cacheFinanceTest } from "./CacheFinanceTest.js";
 import { StockAttributes } from "./CacheFinanceWebSites.js";
 import { CacheService } from "./GasMocks.js";
-export { CACHEFINANCE, CacheFinance };
+export { CACHEFINANCE, CacheFinance, GOOGLEFINANCE_PARAM_NOT_USED };
 
 class Logger {
     static log(msg) {
@@ -59,7 +59,6 @@ function CACHEFINANCE(symbol, attribute = "price", googleFinanceValue = GOOGLEFI
     return CacheFinance.getFinanceData(symbol, attribute, googleFinanceValue);
 }
 
-
 /**
  * @classdesc GOOGLEFINANCE helper function.  Returns default value (if available) and set this value to cache OR
  * reads from short term cache (<21600s) and returns value OR
@@ -72,9 +71,10 @@ class CacheFinance {
      * @param {string} symbol 
      * @param {string} attribute - ["price", "yieldpct", "name"] 
      * @param {any} googleFinanceValue - Optional.  Use GOOGLEFINANCE() to get value, if '#N/A' will read cache.
+     * @param {any} valueFromCache - optional - value previously read from cache.
      * @returns {any}
      */
-    static getFinanceData(symbol, attribute, googleFinanceValue) {
+    static getFinanceData(symbol, attribute, googleFinanceValue, valueFromCache=null) {
         attribute = attribute.toUpperCase().trim();
         symbol = symbol.toUpperCase();
         const cacheKey = CacheFinance.makeCacheKey(symbol, attribute);
@@ -84,7 +84,7 @@ class CacheFinance {
             //  We cache here longer because we would normally be getting data from Google.
             //  If GoogleFinance is failing, we need the data to be held longer since it
             //  it is getting from cache as an emergency backup.
-            CacheFinance.saveFinanceValueToCache(cacheKey, googleFinanceValue, 21600);
+            CacheFinance.saveFinanceValueToCache(cacheKey, googleFinanceValue, 21600, valueFromCache);
             return googleFinanceValue;
         }
 
@@ -207,37 +207,64 @@ class CacheFinance {
      * @param {String} key 
      * @param {any} financialData 
      * @param {Number} shortCacheSeconds 
-     * @param {Number} longCacheDays
+     * @param {any} currentShortCacheValue
      * @returns {void}
      */
-    static saveFinanceValueToCache(key, financialData, shortCacheSeconds = 1200, longCacheDays=7) {
+    static saveFinanceValueToCache(key, financialData, shortCacheSeconds = 1200, currentShortCacheValue=null) {
         const shortCache = CacheService.getScriptCache();
-        const longCache = new ScriptSettings();
-        let start = new Date().getTime();
-
-        const currentShortCacheValue = shortCache.get(key);
-        if (currentShortCacheValue !== null && JSON.parse(currentShortCacheValue) === financialData) {
-            Logger.log(`GoogleFinance VALUE.  No Change in SHORT Cache. ms=${new Date().getTime() - start}`);
-            return;
+        if (currentShortCacheValue === null) {
+            currentShortCacheValue = shortCache.get(key);
         }
+        const longCacheDays = 7;
 
-        if (currentShortCacheValue !== null) {
-            Logger.log(`Short Cache Changed.  Old=${JSON.parse(currentShortCacheValue)} . New=${financialData}`);
+        if (! CacheFinance.isTimeToUpdateCache(currentShortCacheValue, financialData)) {
+            return;
         }
    
         //  If we normally get the price from Google, we want to cache for a longer
         //  time because the only time we need a price for this particular stock
         //  is when GOOGLEFINANCE fails.
-        start = new Date().getTime();
+        let start = new Date().getTime();
         shortCache.put(key, JSON.stringify(financialData), shortCacheSeconds);
         const shortMs = new Date().getTime() - start;
        
         //  For emergency cases when GOOGLEFINANCE is down long term...
         start = new Date().getTime();
+        const longCache = new ScriptSettings();
         longCache.put(key, financialData, longCacheDays);
         const longMs = new Date().getTime() - start;
 
         Logger.log(`SET GoogleFinance VALUE Long/Short Cache. Key=${key}.  Value=${financialData}. Short ms=${shortMs}. Long ms=${longMs}`);
+    }
+
+    /**
+     * 
+     * @param {String} currentShortCacheValue 
+     * @param {any} financialData 
+     * @returns {Boolean}
+     */
+    static isTimeToUpdateCache(currentShortCacheValue, financialData) {
+        if (currentShortCacheValue !== null) {
+            const oldData = JSON.parse(currentShortCacheValue);
+
+            if (oldData === financialData) {
+                Logger.log("GoogleFinance VALUE.  No Change in SHORT Cache.");
+                return false;
+            }
+
+            if (oldData > 0 && financialData > 0) {
+                const changeInPrice =  oldData - financialData;
+                const percentChange = Math.abs(changeInPrice / oldData);
+                if (percentChange < 0.0025) {
+                    Logger.log(`Short Cache Changed very little.  Old=${oldData} . New=${financialData}`);
+                    return false;
+                }
+            }
+
+            Logger.log(`Short Cache Changed.  Old=${oldData} . New=${financialData}`);
+        }
+
+        return true;
     }
 
     /**

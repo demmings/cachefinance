@@ -103,7 +103,9 @@ class ScriptSettings {      //  skipcq: JS-0128
     }
 }
 
-/** Converts data into JSON for getting/setting in ScriptSettings. */
+/**
+ * @classdesc Converts data into JSON for getting/setting in ScriptSettings.
+ */
 class PropertyData {
     /**
      * 
