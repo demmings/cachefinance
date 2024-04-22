@@ -304,6 +304,9 @@ function testCacheTriggerJob() {
     CacheTrigger.getJobData(jobSettings);
 }
 
+/**
+ * Run test manually within Sheets.
+ */
 function testBulkCache() {
     const symbols = [["ABC"], ["DEF"], ["GHI"], ["JKL"], ["MNO"]];
     const data = [11.1, 22.2, 33.3, 44.4, 55.5];
@@ -1162,8 +1165,8 @@ class CacheTrigger {
         }
 
         //  Start job timer and load previously loaded (and not finished) job data.
-        let data = jobSettings.startJobRunTimer(MAX_RUN_SECONDS);
-        let startingSymbol = data.length;
+        const data = jobSettings.startJobRunTimer(MAX_RUN_SECONDS);
+        const startingSymbol = data.length;
 
         for (let i = startingSymbol; i < symbols.length; i++) {
             if (jobSettings.hasExceededJobRunTime()) {
@@ -1286,7 +1289,7 @@ class CacheTrigger {
      */
     static createCacheKeyList(symbols, attribute) {
         const cacheKeyList = [];
-        for (let symbol of symbols) {
+        for (const symbol of symbols) {
             attribute = attribute.toUpperCase().trim();
             const upperCaseSymbol = symbol[0].toUpperCase();
             const cacheKey = CacheFinance.makeCacheKey(upperCaseSymbol, attribute.toUpperCase().trim());
@@ -1308,7 +1311,7 @@ class CacheTrigger {
         const data = shortCache.getAll(cacheKeys);
         const cachedDataList = [];
 
-        for (let key of cacheKeys) {
+        for (const key of cacheKeys) {
             let parsedData = null;
             if (typeof data[key] !== 'undefined') {
                 parsedData = JSON.parse(data[key]);
