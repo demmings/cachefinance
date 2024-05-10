@@ -37,8 +37,7 @@ class ThirdPartyFinance {                   //  skipcq: JS-0128
      * @returns {StockAttributes[]}
      */
     static getMissingStockAttributesFromThirdParty(symbols, attribute) {
-        const financeSites = new FinanceWebsiteSearch();
-        const data = financeSites.getAll(symbols, attribute);
+        const data = FinanceWebsiteSearch.getAll(symbols, attribute);
 
         return data;
     }
@@ -76,7 +75,7 @@ class FinanceWebsiteSearch {
      * @param {String} attribute 
      * @returns {StockAttributes[]}
      */
-    getAll(symbols, attribute) {
+    static getAll(symbols, attribute) {
         const MAX_TIME_FOR_FETCH_Ms = 25000;        //  Custom function times out at 30 seconds, so we need to limit.
         const bestStockSites = FinanceWebsiteSearch.readBestStockWebsites();
         const siteURLs = FinanceWebsiteSearch.getAllStockWebSiteFunctions(symbols, attribute, bestStockSites);
@@ -87,10 +86,10 @@ class FinanceWebsiteSearch {
         while (missingStockData.length > 0 && (Date.now() - startTime) < MAX_TIME_FOR_FETCH_Ms) { 
             const URLs = FinanceWebsiteSearch.getNextUrlBatch(missingStockData);
 
-            Logger.log("Batch=" + batch + ". URLs" + URLs);
+            Logger.log(`Batch=${batch}. URLs${URLs}`);
             const responses = FinanceWebsiteSearch.bulkSiteFetch(URLs);
             const elapsedTime = Date.now() - startTime;
-            Logger.log("Batch=" + batch + ". Responses=" + responses.length + ". Total Elapsed=" + elapsedTime);
+            Logger.log(`Batch=${batch}. Responses=${responses.length}. Total Elapsed=${elapsedTime}`);
             batch++;
 
             FinanceWebsiteSearch.updateStockResults(missingStockData, URLs, responses, attribute, bestStockSites);
@@ -177,7 +176,7 @@ class FinanceWebsiteSearch {
      */
     static readBestStockWebsites() {
         const longCache = new ScriptSettings();
-        let siteObject = longCache.get("CACHE_WEBSITES"); 
+        const siteObject = longCache.get("CACHE_WEBSITES"); 
         
         return siteObject === null ? {} : siteObject;
     }
@@ -200,6 +199,7 @@ class FinanceWebsiteSearch {
     static bulkSiteFetch(URLs) {
         const filteredURLs = URLs.filter(url => url.trim() !== '');
         const fetchURLs = filteredURLs.map(url => {
+            //  skipcq:  JS-0240
             return {
                 'url': url,
                 'method': 'get',

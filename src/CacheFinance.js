@@ -25,16 +25,16 @@ function testYieldPct() {
     Logger.log(`Test CacheFinance FTN-A(yieldpct)=${val}`);
 }
 
-function testCacheFinances() {
+function testCacheFinances() {                                  // skipcq: JS-0128
     // const symbols = [["ABC"], ["DEF"], ["GHI"], ["JKL"], ["TSE:FLJA"]];
     // const data = [[11.1], [22.2], [33.3], [44.4], ["#N/A"]];
 
-    let symbols = SpreadsheetApp.getActiveSpreadsheet().getRangeByName("A30:A165").getValues();
+    const symbols = SpreadsheetApp.getActiveSpreadsheet().getRangeByName("A30:A165").getValues();
     const data = SpreadsheetApp.getActiveSpreadsheet().getRangeByName("E30:E165").getValues();
 
     const cacheData = CACHEFINANCES(symbols, "PRICE", data);
 
-    let singleSymbols = CacheFinanceUtils.convertRowsToSingleArray(symbols);
+    const singleSymbols = CacheFinanceUtils.convertRowsToSingleArray(symbols);
 
     Logger.log("BULK CACHE TEST Success");
 }
@@ -113,7 +113,7 @@ function CACHEFINANCES(symbols, attribute = "price", defaultValues = [], webSite
         return '';
     }
 
-    Logger.log("CacheFinances START.  Attribute=" + attribute + " symbols=" + symbols.length);
+    Logger.log(`CacheFinances START.  Attribute=${attribute} symbols=${symbols.length}`);
 
     return CacheFinance.getBulkFinanceData(newSymbols, attribute, newValues, webSiteLookupCacheSeconds);
 }

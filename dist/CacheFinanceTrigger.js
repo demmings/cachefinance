@@ -8,16 +8,16 @@ function testYieldPct() {
     Logger.log(`Test CacheFinance FTN-A(yieldpct)=${val}`);
 }
 
-function testCacheFinances() {
+function testCacheFinances() {                                  // skipcq: JS-0128
     // const symbols = [["ABC"], ["DEF"], ["GHI"], ["JKL"], ["TSE:FLJA"]];
     // const data = [[11.1], [22.2], [33.3], [44.4], ["#N/A"]];
 
-    let symbols = SpreadsheetApp.getActiveSpreadsheet().getRangeByName("A30:A165").getValues();
+    const symbols = SpreadsheetApp.getActiveSpreadsheet().getRangeByName("A30:A165").getValues();
     const data = SpreadsheetApp.getActiveSpreadsheet().getRangeByName("E30:E165").getValues();
 
     const cacheData = CACHEFINANCES(symbols, "PRICE", data);
 
-    let singleSymbols = CacheFinanceUtils.convertRowsToSingleArray(symbols);
+    const singleSymbols = CacheFinanceUtils.convertRowsToSingleArray(symbols);
 
     Logger.log("BULK CACHE TEST Success");
 }
@@ -96,7 +96,7 @@ function CACHEFINANCES(symbols, attribute = "price", defaultValues = [], webSite
         return '';
     }
 
-    Logger.log("CacheFinances START.  Attribute=" + attribute + " symbols=" + symbols.length);
+    Logger.log(`CacheFinances START.  Attribute=${attribute} symbols=${symbols.length}`);
 
     return CacheFinance.getBulkFinanceData(newSymbols, attribute, newValues, webSiteLookupCacheSeconds);
 }
@@ -1698,8 +1698,7 @@ class ThirdPartyFinance {                   //  skipcq: JS-0128
      * @returns {StockAttributes[]}
      */
     static getMissingStockAttributesFromThirdParty(symbols, attribute) {
-        const financeSites = new FinanceWebsiteSearch();
-        const data = financeSites.getAll(symbols, attribute);
+        const data = FinanceWebsiteSearch.getAll(symbols, attribute);
 
         return data;
     }
@@ -1737,7 +1736,7 @@ class FinanceWebsiteSearch {
      * @param {String} attribute 
      * @returns {StockAttributes[]}
      */
-    getAll(symbols, attribute) {
+    static getAll(symbols, attribute) {
         const MAX_TIME_FOR_FETCH_Ms = 25000;        //  Custom function times out at 30 seconds, so we need to limit.
         const bestStockSites = FinanceWebsiteSearch.readBestStockWebsites();
         const siteURLs = FinanceWebsiteSearch.getAllStockWebSiteFunctions(symbols, attribute, bestStockSites);
@@ -1748,10 +1747,10 @@ class FinanceWebsiteSearch {
         while (missingStockData.length > 0 && (Date.now() - startTime) < MAX_TIME_FOR_FETCH_Ms) { 
             const URLs = FinanceWebsiteSearch.getNextUrlBatch(missingStockData);
 
-            Logger.log("Batch=" + batch + ". URLs" + URLs);
+            Logger.log(`Batch=${batch}. URLs${URLs}`);
             const responses = FinanceWebsiteSearch.bulkSiteFetch(URLs);
             const elapsedTime = Date.now() - startTime;
-            Logger.log("Batch=" + batch + ". Responses=" + responses.length + ". Total Elapsed=" + elapsedTime);
+            Logger.log(`Batch=${batch}. Responses=${responses.length}. Total Elapsed=${elapsedTime}`);
             batch++;
 
             FinanceWebsiteSearch.updateStockResults(missingStockData, URLs, responses, attribute, bestStockSites);
@@ -1838,7 +1837,7 @@ class FinanceWebsiteSearch {
      */
     static readBestStockWebsites() {
         const longCache = new ScriptSettings();
-        let siteObject = longCache.get("CACHE_WEBSITES"); 
+        const siteObject = longCache.get("CACHE_WEBSITES"); 
         
         return siteObject === null ? {} : siteObject;
     }
@@ -1861,6 +1860,7 @@ class FinanceWebsiteSearch {
     static bulkSiteFetch(URLs) {
         const filteredURLs = URLs.filter(url => url.trim() !== '');
         const fetchURLs = filteredURLs.map(url => {
+            //  skipcq:  JS-0240
             return {
                 'url': url,
                 'method': 'get',
@@ -2773,9 +2773,10 @@ class TdMarketsEtf {
     /**
      * 
      * @param {String} symbol 
+     * @param {String} _attribute
      * @returns {String}
      */
-    static getURL(symbol, attribute) {
+    static getURL(symbol, _attribute) {
         return TdMarketResearch.getURL(symbol, "ETF");
     }
 
@@ -2821,9 +2822,10 @@ class TdMarketsStock {
     /**
      * 
      * @param {String} symbol 
+     * @param {String} _attribute
      * @returns {String}
      */
-    static getURL(symbol, attribute) {
+    static getURL(symbol, _attribute) {
         return TdMarketResearch.getURL(symbol, "STOCK");
     }
 
@@ -2859,11 +2861,11 @@ class TdMarketResearch {
     /**
      * 
      * @param {String} symbol 
-     * @param {String} attribute
+     * @param {String} _attribute
      * @param {String} type 
      * @returns {StockAttributes}
      */
-    static getInfo(symbol, attribute, type = "ETF") {
+    static getInfo(symbol, _attribute, type = "ETF") {
         const URL = TdMarketResearch.getURL(symbol, type);
 
         let html = null;
@@ -2987,10 +2989,10 @@ class YahooFinance {
     /**
      * 
      * @param {String} symbol 
-     * @param {String} [attribute]
+     * @param {String} _attribute
      * @returns {String}
      */
-    static getURL(symbol, attribute) {
+    static getURL(symbol, _attribute) {
         const countryCode = FinanceWebSites.getTickerCountryCode(symbol);
         if (countryCode !== "us") {
             return "";
@@ -3110,10 +3112,10 @@ class GlobeAndMail {
     /**
      * 
      * @param {String} symbol 
-     * @param {String} [attribute]
+     * @param {String} _attribute
      * @returns {String}
      */
-    static getURL(symbol, attribute) {
+    static getURL(symbol, _attribute) {
         return `https://www.theglobeandmail.com/investing/markets/stocks/${GlobeAndMail.getTicker(symbol)}`;
     }
 
@@ -3286,11 +3288,11 @@ class FinnHub {
     /**
      * 
      * @param {String} jsonStr 
-     * @param {String} symbol
+     * @param {String} _symbol
      * @param {String} attribute
      * @returns {StockAttributes}
      */
-    static parseResponse(jsonStr, symbol, attribute) {
+    static parseResponse(jsonStr, _symbol, attribute) {
         const data = new StockAttributes();
 
         const hubData = JSON.parse(jsonStr);

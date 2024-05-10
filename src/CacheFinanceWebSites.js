@@ -251,9 +251,10 @@ class TdMarketsEtf {
     /**
      * 
      * @param {String} symbol 
+     * @param {String} _attribute
      * @returns {String}
      */
-    static getURL(symbol, attribute) {
+    static getURL(symbol, _attribute) {
         return TdMarketResearch.getURL(symbol, "ETF");
     }
 
@@ -299,9 +300,10 @@ class TdMarketsStock {
     /**
      * 
      * @param {String} symbol 
+     * @param {String} _attribute
      * @returns {String}
      */
-    static getURL(symbol, attribute) {
+    static getURL(symbol, _attribute) {
         return TdMarketResearch.getURL(symbol, "STOCK");
     }
 
@@ -337,11 +339,11 @@ class TdMarketResearch {
     /**
      * 
      * @param {String} symbol 
-     * @param {String} attribute
+     * @param {String} _attribute
      * @param {String} type 
      * @returns {StockAttributes}
      */
-    static getInfo(symbol, attribute, type = "ETF") {
+    static getInfo(symbol, _attribute, type = "ETF") {
         const URL = TdMarketResearch.getURL(symbol, type);
 
         let html = null;
@@ -465,10 +467,10 @@ class YahooFinance {
     /**
      * 
      * @param {String} symbol 
-     * @param {String} [attribute]
+     * @param {String} _attribute
      * @returns {String}
      */
-    static getURL(symbol, attribute) {
+    static getURL(symbol, _attribute) {
         const countryCode = FinanceWebSites.getTickerCountryCode(symbol);
         if (countryCode !== "us") {
             return "";
@@ -588,10 +590,10 @@ class GlobeAndMail {
     /**
      * 
      * @param {String} symbol 
-     * @param {String} [attribute]
+     * @param {String} _attribute
      * @returns {String}
      */
-    static getURL(symbol, attribute) {
+    static getURL(symbol, _attribute) {
         return `https://www.theglobeandmail.com/investing/markets/stocks/${GlobeAndMail.getTicker(symbol)}`;
     }
 
@@ -764,11 +766,11 @@ class FinnHub {
     /**
      * 
      * @param {String} jsonStr 
-     * @param {String} symbol
+     * @param {String} _symbol
      * @param {String} attribute
      * @returns {StockAttributes}
      */
-    static parseResponse(jsonStr, symbol, attribute) {
+    static parseResponse(jsonStr, _symbol, attribute) {
         const data = new StockAttributes();
 
         const hubData = JSON.parse(jsonStr);
