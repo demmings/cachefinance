@@ -20,7 +20,7 @@
 
 * **CACHEFINANCE** is a custom function to supplement GOOGLEFINANCE.
   * Use this for ONE symbol and ONE attribute lookup.
-* * **CACHEFINANCES** is a custom function similar to **CACHEFINANCE** except it is used to process a range of symbols.
+* **CACHEFINANCES** is a custom function similar to **CACHEFINANCE** except it is used to process a range of symbols.
 * Valid **STOCK** data is always available even when GOOGLEFINANCE refuses to work.
 * GOOGLEFINANCE does not support all stock symbols.  Many unsupported google stocks can still get price/name/yield data (using web screen scraping)
 * As you can guess from the name, data is cached so when '#N/A' appears, it uses the last known value so that it does not mess up your asset history logging/graphing.
@@ -102,8 +102,23 @@
         *  ```=CACHEFINANCE("TSE:ZTL", "price", GOOGLEFINANCE("TSE:ZTL", "price"))```
 
 ## CACHEFINANCES
+* **WHY USE?**
+  * If you have many individual lookups using CACHEFINANCE() for price, name, yieldpct and each CACHEFINANCE() trigger has to make several time consuming API calls to SHEETS, it is less efficient than using CACHEFINANCES() which uses the absolute minimum of API calls.
+  * Stock prices for symbols that never get a default value (like many Canadian stocks such as TSE:ZTL), the CACHEFINANCE() function might only be executed infrequently since none of the parameter data chages - which does force the custom function to run.  Now these stocks will be updated regularly since any other stock price which IS updated in the default range, will trigger the function to run.  After the cache seconds has expired, it will use the third party website data to update the value.
 * **SYNTAX**.
     *  ```CACHEFINANCES(symbolRange, attribute, defaultValueRange, cacheSeconds)```
+    *  **symbolRange** - A sheets RANGE of cells that contains properly formatted stock symbols (with exchange)
+       *  examples:  TSE:ZTL, NASDAQ:CXSE, NYSEARCA:EDV
+    *  **attribute** - Google Finance Attribute name (not a range).
+       *  Supported attributes for third party websites (used internally) are:
+          *  "PRICE"
+          *  "NAME"
+          *  "YIELDPCT"
+    *  **defaultValueRange** - A sheets range of cells that contain a default value (use GOOGLEFINANCE() to provide this).
+       *  For attributes that have no default value (i.e. yieldpct), just leave empty.
+    *  **cacheSeconds** - Cache Seconds.  optional (0 --> 21600).  Used primarily for symbols/attributes that NEVER provide a default value.  
+       *  So for prices data attribute, this should be set fairly low (something like 1200 seconds).  This will cause actual website lookups to find the data every **X** seconds.  This operation is slow and expensive (resouce wise), but it is important to have fairly recent values if you monitor your stock values during the day.
+       *  For attributes like **NAME**, which almost never changes, you should set the cache value to a higher number like 21600.  There is no need to waste resources looking up websites to find data that rarely changes - and even if it does, the portfolio values would not be affected.
 * **EXAMPLES**
 ```
 =CACHEFINANCES(A30:A164, "price", B30:B164, 1200)

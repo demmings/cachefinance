@@ -14,7 +14,7 @@ class Logger {
 /**
  * @classdesc Multi-purpose functions used within the cache finance custom functions.
  */
-class CacheFinanceUtils {
+class CacheFinanceUtils {                       // skipcq: JS-0128
     /**
      * 
      * @param {String[]} symbols 
