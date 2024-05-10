@@ -373,7 +373,7 @@ class StockWebURL {
      */
     updateBestSites(bestStockSites, attribute) {
         const key = CacheFinanceUtils.makeCacheKey(this.symbol, attribute);
-        bestStockSites[key] = (this.stockAttributes === null || ! this.stockAttributes.isAttributeSet(attribute)) ? "" : this.siteName[this.siteIterator];
+        bestStockSites[key] = (! this?.stockAttributes.isAttributeSet(attribute)) ? "" : this.siteName[this.siteIterator];
     }
 
     /**

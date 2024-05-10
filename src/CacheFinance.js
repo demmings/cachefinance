@@ -36,7 +36,7 @@ function testCacheFinances() {                                  // skipcq: JS-01
 
     const singleSymbols = CacheFinanceUtils.convertRowsToSingleArray(symbols);
 
-    Logger.log("BULK CACHE TEST Success");
+    Logger.log(`BULK CACHE TEST Success${cacheData} . ${singleSymbols}`);
 }
 
 /**
