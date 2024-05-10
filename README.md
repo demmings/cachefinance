@@ -103,7 +103,7 @@
 
 ## CACHEFINANCES
 * **SYNTAX**.
-    *  ```CACHEFINANCE(symbolRange, attribute, defaultValueRange, cacheSeconds)```
+    *  ```CACHEFINANCES(symbolRange, attribute, defaultValueRange, cacheSeconds)```
 * **EXAMPLES**
 ```
 =CACHEFINANCES(A30:A164, "price", B30:B164, 1200)
