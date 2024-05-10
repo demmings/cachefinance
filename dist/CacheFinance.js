@@ -8,6 +8,20 @@ function testYieldPct() {
     Logger.log(`Test CacheFinance FTN-A(yieldpct)=${val}`);
 }
 
+function testCacheFinances() {
+    // const symbols = [["ABC"], ["DEF"], ["GHI"], ["JKL"], ["TSE:FLJA"]];
+    // const data = [[11.1], [22.2], [33.3], [44.4], ["#N/A"]];
+
+    let symbols = SpreadsheetApp.getActiveSpreadsheet().getRangeByName("A30:A165").getValues();
+    const data = SpreadsheetApp.getActiveSpreadsheet().getRangeByName("E30:E165").getValues();
+
+    const cacheData = CACHEFINANCES(symbols, "PRICE", data);
+
+    let singleSymbols = CacheFinanceUtils.convertRowsToSingleArray(symbols);
+
+    Logger.log("BULK CACHE TEST Success");
+}
+
 /**
  * Enhancement to GOOGLEFINANCE function for stock/ETF symbols that a) return "#N/A" (temporary or consistently), b) data never available like 'yieldpct' for ETF's. 
  * @param {string} symbol 
@@ -27,8 +41,7 @@ function CACHEFINANCE(symbol, attribute = "price", googleFinanceValue = GOOGLEFI
     }
 
     if (attribute.toUpperCase() === "CLEARCACHE") {
-        const ss = new ScriptSettings();
-        ss.expire(true);
+        ScriptSettings.expire(true);
         return 'Cache Cleared';
     }
 
@@ -41,6 +54,51 @@ function CACHEFINANCE(symbol, attribute = "price", googleFinanceValue = GOOGLEFI
     }
 
     return CacheFinance.getFinanceData(symbol, attribute, googleFinanceValue);
+}
+
+/**
+ * Bulk cache retrieval of finance data for updating large quantity of stock attributes.
+ * @param {String[][]} symbols 
+ * @param {String} attribute - ["price", "yieldpct", "name"]
+ * @param {any[][]} defaultValues Default values from GoogleFinance()
+ * @param {Number} webSiteLookupCacheSeconds Min. time between Web Lookups (max 21600 seconds)
+ * @returns 
+ * @customfunction
+ */
+function CACHEFINANCES(symbols, attribute = "price", defaultValues = [], webSiteLookupCacheSeconds = -1) {         // skipcq: JS-0128
+    if (!Array.isArray(symbols)) {
+        throw new Error("Expecting list of stock symbols.");
+    }
+
+    if (Array.isArray(symbols) && Array.isArray(defaultValues) && defaultValues.length > 0 && symbols.length !== defaultValues.length) {
+        throw new Error("Stock symbol RANGE must match default values range.");
+    }
+
+    const trimmedSymbols = CacheFinanceUtils.removeEmptyRecordsAtEndOfTable(symbols);
+    const trimmedValues = CacheFinanceUtils.removeEmptyRecordsAtEndOfTable(defaultValues);
+
+    //  Data ranges from sheets are double arrays.  Just make life simple and convert to single array.
+    const newSymbols = CacheFinanceUtils.convertRowsToSingleArray(trimmedSymbols);
+    const newValues = CacheFinanceUtils.convertRowsToSingleArray(trimmedValues);
+
+    attribute = attribute.toUpperCase().trim();
+    if (attribute === "CLEARCACHE") {
+        ScriptSettings.expire(true);
+        return 'Long Cache Cleared';
+    }
+
+    if (typeof newValues === 'string' && newValues.toUpperCase() === 'CLEARCACHE') {
+        CacheFinanceUtils.bulkShortCacheRemoveAll(newSymbols, attribute);
+        return 'Short Cache Cleared';
+    }
+
+    if (newSymbols.length === 0 || attribute === '') {
+        return '';
+    }
+
+    Logger.log("CacheFinances START.  Attribute=" + attribute + " symbols=" + symbols.length);
+
+    return CacheFinance.getBulkFinanceData(newSymbols, attribute, newValues, webSiteLookupCacheSeconds);
 }
 
 /**
@@ -58,10 +116,10 @@ class CacheFinance {
      * @param {any} valueFromCache - optional - value previously read from cache.
      * @returns {any}
      */
-    static getFinanceData(symbol, attribute, googleFinanceValue, valueFromCache=null) {
+    static getFinanceData(symbol, attribute, googleFinanceValue, valueFromCache = null) {
         attribute = attribute.toUpperCase().trim();
         symbol = symbol.toUpperCase();
-        const cacheKey = CacheFinance.makeCacheKey(symbol, attribute);
+        const cacheKey = CacheFinanceUtils.makeCacheKey(symbol, attribute);
 
         //  This time GOOGLEFINANCE worked!!!
         if (googleFinanceValue !== GOOGLEFINANCE_PARAM_NOT_USED && googleFinanceValue !== "#N/A" && googleFinanceValue !== '#ERROR!') {
@@ -104,12 +162,151 @@ class CacheFinance {
 
     /**
      * 
-     * @param {String} symbol 
+     * @param {String[]} symbols 
      * @param {String} attribute 
-     * @returns {String}
+     * @param {any[]} googleFinanceValues 
+     * @param {Number} webSiteLookupCacheSeconds
+     * @returns {any[][]}
      */
-    static makeCacheKey(symbol, attribute) {
-        return `${attribute}|${symbol}`;
+    static getBulkFinanceData(symbols, attribute, googleFinanceValues, webSiteLookupCacheSeconds) {
+        const MAX_SHORT_CACHE_SECONDS = 21600;      // For VALID GOOGLEFINANCE values.
+        const MAX_SHORT_CACHE_THIRD_PARTY = 1200;   // This will force a lookup every 20 minutes for stocks NEVER found in GOOGLEFINANCE()
+
+        //  ALL valid google data points are put in SHORT cache.
+        CacheFinanceUtils.bulkShortCachePut(symbols, attribute, googleFinanceValues, MAX_SHORT_CACHE_SECONDS);
+
+        //  All invalid data points with a valid entry in short cache is used.
+        googleFinanceValues = CacheFinance.updateMissingValuesFromShortCache(symbols, attribute, googleFinanceValues);
+
+        //  At this point, it will be mostly items that GOOGLE FINANCE just never works for.
+        let symbolsWithNoData = CacheFinance.getSymbolsWithNoValidData(symbols, googleFinanceValues);
+
+        //  Make requests (very slow) from financial web sites to find missing data.
+        const thirdPartyStockAtributes = ThirdPartyFinance.getMissingStockAttributesFromThirdParty(symbolsWithNoData, attribute);
+        const thirdPartyFinanceValues = CacheFinance.getValuesFromStockAttributes(thirdPartyStockAtributes, attribute);
+        googleFinanceValues = CacheFinance.updateMasterWithMissed(symbols, googleFinanceValues, symbolsWithNoData, thirdPartyFinanceValues);
+
+        //  All data found in websites (not GOOGLEFINANCE) is placed in cache (for a shorter period of time than those from GOOGLEFINANCE)
+        const cacheSeconds = webSiteLookupCacheSeconds === -1 ? MAX_SHORT_CACHE_THIRD_PARTY : webSiteLookupCacheSeconds;
+        CacheFinance.putAllStockAttributeDataIntoShortCache(thirdPartyStockAtributes, symbolsWithNoData, cacheSeconds);
+
+        // Last, last resort.  Try to find in LONG CACHE.  This could be DAYS old, but it is better than invalid data.
+        symbolsWithNoData = CacheFinance.getSymbolsWithNoValidData(symbols, googleFinanceValues);
+        const longCacheValues = CacheFinanceUtils.bulkLongCacheGet(symbolsWithNoData, attribute);
+        googleFinanceValues = CacheFinance.updateMasterWithMissed(symbols, googleFinanceValues, symbolsWithNoData, longCacheValues);
+
+        //  Save everything we have found into the long cache for dire use cases in future.
+        CacheFinanceUtils.bulkLongCachePut(symbols, attribute, googleFinanceValues);
+
+        return CacheFinanceUtils.convertSingleToDoubleArray(googleFinanceValues);
+    }
+
+    /**
+     * 
+     * @param {StockAttributes[]} stockAttributes 
+     * @param {String} attribute 
+     * @returns 
+     */
+    static getValuesFromStockAttributes(stockAttributes, attribute) {
+        return stockAttributes.map(stockData => stockData.getValue(attribute));
+    }
+
+    /**
+     * 
+     * @param {StockAttributes[]} thirdPartyStockAtributes 
+     * @param {String[]} symbolsWithNoData 
+     * @param {Number} cacheSeconds 
+     */
+    static putAllStockAttributeDataIntoShortCache(thirdPartyStockAtributes, symbolsWithNoData, cacheSeconds) {
+        const thirdPartyPriceValues = CacheFinance.getValuesFromStockAttributes(thirdPartyStockAtributes, "PRICE");
+        const thirdPartyNameValues = CacheFinance.getValuesFromStockAttributes(thirdPartyStockAtributes, "NAME");
+        const thirdPartyYieldValues = CacheFinance.getValuesFromStockAttributes(thirdPartyStockAtributes, "YIELDPCT");
+
+        CacheFinanceUtils.bulkShortCachePut(symbolsWithNoData, "PRICE", thirdPartyPriceValues, cacheSeconds);
+        CacheFinanceUtils.bulkShortCachePut(symbolsWithNoData, "NAME", thirdPartyNameValues, cacheSeconds);
+        CacheFinanceUtils.bulkShortCachePut(symbolsWithNoData, "YIELDPCT", thirdPartyYieldValues, cacheSeconds);
+    }
+
+    /**
+     * 
+     * @param {String[]} symbols 
+     * @param {String} attribute 
+     * @param {any[]} googleFinanceValues 
+     * @returns {any[]}
+     */
+    static updateMissingValuesFromShortCache(symbols, attribute, googleFinanceValues) {
+        if (CacheFinance.isAllGoogleDefaultValuesValid(symbols, googleFinanceValues)) {
+            return googleFinanceValues;
+        }
+
+        const updatedFinanceValues = [];
+        const valueFromCache = CacheFinanceUtils.bulkShortCacheGet(symbols, attribute);
+        for (let i = 0; i < symbols.length; i++) {
+            if (CacheFinanceUtils.isValidGoogleValue(googleFinanceValues[i])) {
+                updatedFinanceValues.push(googleFinanceValues[i]);
+            } else {
+                const valueToUseFromCache = valueFromCache[i] !== null ? valueFromCache[i] : "#N/A";
+                updatedFinanceValues.push(valueToUseFromCache);
+            }
+        }
+
+        return updatedFinanceValues;
+    }
+
+    /**
+     * 
+     * @param {String[]} symbols 
+     * @param {any[]} googleFinanceValues 
+     * @returns {Boolean}
+     */
+    static isAllGoogleDefaultValuesValid(symbols, googleFinanceValues) {
+        if (symbols.length !== googleFinanceValues.length) {
+            return false;
+        }
+
+        return  CacheFinance.getSymbolsWithNoValidData(symbols, googleFinanceValues).length === 0;
+    }
+
+    /**
+     * 
+     * @param {String[]} symbols 
+     * @param {any[]} googleFinanceValues 
+     * @returns {String[]}
+     */
+    static getSymbolsWithNoValidData(symbols, googleFinanceValues) {
+        const symbolsWithNoData = [];
+
+        for (let i = 0; i < symbols.length; i++) {
+            if (!CacheFinanceUtils.isValidGoogleValue(googleFinanceValues[i])) {
+                symbolsWithNoData.push(symbols[i]);
+            }
+        }
+
+        return symbolsWithNoData;
+    }
+
+    /**
+     * 
+     * @param {String[]} symbols 
+     * @param {any[]} googleFinanceValues 
+     * @param {String[]} symbolsWithNoData 
+     * @param {any[]} thirdPartyFinanceValues 
+     * @returns 
+     */
+    static updateMasterWithMissed(symbols, googleFinanceValues, symbolsWithNoData, thirdPartyFinanceValues) {
+        let startPos = 0;
+
+        for (let i = 0; i < symbolsWithNoData.length; i++) {
+            const j = symbols.indexOf(symbolsWithNoData[i], startPos);
+            if (j !== -1) {
+                if (CacheFinanceUtils.isValidGoogleValue(thirdPartyFinanceValues[i])) {
+                    googleFinanceValues[j] = thirdPartyFinanceValues[i];
+                }
+                startPos = j;
+            }
+        }
+
+        return googleFinanceValues;
     }
 
     /**
@@ -179,11 +376,11 @@ class CacheFinance {
         if (stockAttributes === null)
             return;
         if (stockAttributes.isAttributeSet("NAME"))
-            CacheFinance.saveFinanceValueToCache(CacheFinance.makeCacheKey(symbol, "NAME"), stockAttributes.stockName, 1200);
+            CacheFinance.saveFinanceValueToCache(CacheFinanceUtils.makeCacheKey(symbol, "NAME"), stockAttributes.stockName, 1200);
         if (stockAttributes.isAttributeSet("PRICE"))
-            CacheFinance.saveFinanceValueToCache(CacheFinance.makeCacheKey(symbol, "PRICE"), stockAttributes.stockPrice, 1200);
+            CacheFinance.saveFinanceValueToCache(CacheFinanceUtils.makeCacheKey(symbol, "PRICE"), stockAttributes.stockPrice, 1200);
         if (stockAttributes.isAttributeSet("YIELDPCT"))
-            CacheFinance.saveFinanceValueToCache(CacheFinance.makeCacheKey(symbol, "YIELDPCT"), stockAttributes.yieldPct, 1200);
+            CacheFinance.saveFinanceValueToCache(CacheFinanceUtils.makeCacheKey(symbol, "YIELDPCT"), stockAttributes.yieldPct, 1200);
     }
 
     /**
@@ -194,24 +391,24 @@ class CacheFinance {
      * @param {any} currentShortCacheValue
      * @returns {void}
      */
-    static saveFinanceValueToCache(key, financialData, shortCacheSeconds = 1200, currentShortCacheValue=null) {
+    static saveFinanceValueToCache(key, financialData, shortCacheSeconds = 1200, currentShortCacheValue = null) {
         const shortCache = CacheService.getScriptCache();
         if (currentShortCacheValue === null) {
             currentShortCacheValue = shortCache.get(key);
         }
         const longCacheDays = 7;
 
-        if (! CacheFinance.isTimeToUpdateCache(currentShortCacheValue, financialData)) {
+        if (!CacheFinance.isTimeToUpdateCache(currentShortCacheValue, financialData)) {
             return;
         }
-   
+
         //  If we normally get the price from Google, we want to cache for a longer
         //  time because the only time we need a price for this particular stock
         //  is when GOOGLEFINANCE fails.
         let start = new Date().getTime();
         shortCache.put(key, JSON.stringify(financialData), shortCacheSeconds);
         const shortMs = new Date().getTime() - start;
-       
+
         //  For emergency cases when GOOGLEFINANCE is down long term...
         start = new Date().getTime();
         const longCache = new ScriptSettings();
@@ -237,7 +434,7 @@ class CacheFinance {
             }
 
             if (oldData > 0 && financialData > 0) {
-                const changeInPrice =  oldData - financialData;
+                const changeInPrice = oldData - financialData;
                 const percentChange = Math.abs(changeInPrice / oldData);
                 if (percentChange < 0.0025) {
                     Logger.log(`Short Cache Changed very little.  Old=${oldData} . New=${financialData}`);
@@ -257,8 +454,8 @@ class CacheFinance {
      * @param {String} attribute 
      */
     static deleteFromCache(symbol, attribute) {
-        const key = CacheFinance.makeCacheKey(symbol, attribute);
-        
+        const key = CacheFinanceUtils.makeCacheKey(symbol, attribute);
+
         CacheFinance.deleteFromShortCache(key);
         CacheFinance.deleteFromLongCache(key);
     }
@@ -349,31 +546,96 @@ class ScriptSettings {      //  skipcq: JS-0128
     }
 
     /**
+     * Puts list of data into cache using one API call.  Data is converted to JSON before it is updated.
+     * @param {String[]} cacheKeys 
+     * @param {any[]} newCacheData 
+     * @param {Number} daysToHold
+     */
+    static putAllKeysWithData(cacheKeys, newCacheData, daysToHold = 7) {
+        const bulkData = {};
+
+        for (let i = 0; i < cacheKeys.length; i++) {
+            //  Create our object with an expiry time.
+            const objData = new PropertyData(newCacheData[i], daysToHold);
+
+            //  Our property needs to be a string
+            bulkData[cacheKeys[i]] = JSON.stringify(objData);
+        }
+
+        PropertiesService.getScriptProperties().setProperties(bulkData);
+    }
+
+    /**
+     * Returns ALL cached data for each key value requested. 
+     * Only 1 API call is made, so much faster than retrieving single values.
+     * @param {String[]} cacheKeys 
+     * @returns {any[]}
+     */
+    static getAll(cacheKeys) {
+        const values = [];
+        const allProperties = PropertiesService.getScriptProperties().getProperties();
+
+        //  Removing properties is very slow, so remove only 1 at a time.  This is enough as this function is called frequently.
+        ScriptSettings.expire(false, 1, allProperties);
+
+        for (const key of cacheKeys) {
+            const myData = allProperties[key];
+
+            if (typeof myData === 'undefined') {
+                values.push(null);
+            }
+            else {
+                /** @type {PropertyData} */
+                const myPropertyData = JSON.parse(myData);
+
+                if (PropertyData.isExpired(myPropertyData)) {
+                    values.push(null);
+                    PropertiesService.getScriptProperties().deleteProperty(key);
+                    Logger.log(`Delete expired Script Property Key=${key}`);
+                }
+                else {
+                    values.push(PropertyData.getData(myPropertyData));
+                }
+            }
+        }
+
+        return values;
+    }
+
+    /**
      * Removes script settings that have expired.
      * @param {Boolean} deleteAll - true - removes ALL script settings regardless of expiry time.
+     * @param {Number} maxDelete - maximum number of items to delete that are expired.
+     * @param {Object} allPropertiesObject - All properties already loaded.  If null, will load iteself.
      */
-    expire(deleteAll) {
-        const allKeys = this.scriptProperties.getKeys();
+    static expire(deleteAll, maxDelete = 999, allPropertiesObject = null) {
+        const allProperties = allPropertiesObject === null ? PropertiesService.getScriptProperties().getProperties() : allPropertiesObject;
+        const allKeys = Object.keys(allProperties);
+        let deleteCount = 0;
 
         for (const key of allKeys) {
-            const myData = this.scriptProperties.getProperty(key);
+            let propertyValue = null;
+            try {
+                propertyValue = JSON.parse(allProperties[key]);
+            }
+            catch (e) {
+                //  A property that is NOT cached by CACHEFINANCE
+                continue;
+            }
 
-            if (myData !== null) {
-                let propertyValue = null;
-                try {
-                    propertyValue = JSON.parse(myData);
-                }
-                catch (e) {
-                    Logger.log(`Script property data is not JSON. key=${key}`);
-                    continue;
-                }
+            const propertyOfThisApplication = propertyValue?.expiry !== undefined;
 
-                const propertyOfThisApplication = propertyValue?.expiry !== undefined;
+            if (propertyOfThisApplication && (PropertyData.isExpired(propertyValue) || deleteAll)) {
+                PropertiesService.getScriptProperties().deleteProperty(key);
+                delete allProperties[key];
 
-                if (propertyOfThisApplication && (PropertyData.isExpired(propertyValue) || deleteAll)) {
-                    this.scriptProperties.deleteProperty(key);
-                    Logger.log(`Removing expired SCRIPT PROPERTY: key=${key}`);
-                }
+                Logger.log(`Removing expired SCRIPT PROPERTY: key=${key}`);
+
+                deleteCount++;
+            }
+
+            if (deleteCount >= maxDelete) {
+                return;
             }
         }
     }
@@ -415,9 +677,7 @@ class PropertyData {
     static getData(obj) {
         let value = null;
         try {
-            if (!PropertyData.isExpired(obj)) {
-                value = JSON.parse(obj.myData);
-            }
+            value = JSON.parse(obj.myData);
         }
         catch (ex) {
             Logger.log(`Invalid property value.  Not JSON: ${ex.toString()}`);
@@ -454,6 +714,19 @@ class ThirdPartyFinance {                   //  skipcq: JS-0128
 
         return data;
     }
+
+    /**
+     * 
+     * @param {String[]} symbols 
+     * @param {String} attribute 
+     * @returns {StockAttributes[]}
+     */
+    static getMissingStockAttributesFromThirdParty(symbols, attribute) {
+        const financeSites = new FinanceWebsiteSearch();
+        const data = financeSites.getAll(symbols, attribute);
+
+        return data;
+    }
 }
 
 /**
@@ -480,6 +753,155 @@ class FinanceWebsiteSearch {
         }
 
         return dataPlan.data;
+    }
+
+    /**
+     * 
+     * @param {String[]} symbols 
+     * @param {String} attribute 
+     * @returns {StockAttributes[]}
+     */
+    getAll(symbols, attribute) {
+        const MAX_TIME_FOR_FETCH_Ms = 25000;        //  Custom function times out at 30 seconds, so we need to limit.
+        const bestStockSites = FinanceWebsiteSearch.readBestStockWebsites();
+        const siteURLs = FinanceWebsiteSearch.getAllStockWebSiteFunctions(symbols, attribute, bestStockSites);
+        
+        let batch = 1;
+        const startTime = Date.now();
+        let missingStockData = [...siteURLs];
+        while (missingStockData.length > 0 && (Date.now() - startTime) < MAX_TIME_FOR_FETCH_Ms) { 
+            const URLs = FinanceWebsiteSearch.getNextUrlBatch(missingStockData);
+
+            Logger.log("Batch=" + batch + ". URLs" + URLs);
+            const responses = FinanceWebsiteSearch.bulkSiteFetch(URLs);
+            const elapsedTime = Date.now() - startTime;
+            Logger.log("Batch=" + batch + ". Responses=" + responses.length + ". Total Elapsed=" + elapsedTime);
+            batch++;
+
+            FinanceWebsiteSearch.updateStockResults(missingStockData, URLs, responses, attribute, bestStockSites);
+            
+            missingStockData = missingStockData.filter(stock => ! stock.stockAttributes.isAttributeSet(attribute) && ! stock.isSitesDone())
+        }
+
+        //  TODO:  If separate CACHEFINANCES() run at the same time, the last process to finish will overwrite any new results
+        //         from the other runs.  This is not critical, since it is ONLY  used to improve the ordering of sites to call AND
+        //         over time as the processes run on their own, the data will be corrected.
+        FinanceWebsiteSearch.writeBestStockWebsites(bestStockSites);
+        
+        return siteURLs.map(stock => stock.stockAttributes);
+    }
+
+    /**
+     * 
+     * @param {StockWebURL[]} missingStockData 
+     * @returns {String[]}
+     */
+    static getNextUrlBatch(missingStockData) {
+        const MAX_FETCHALL_BATCH_SIZE = 50;
+
+        let URLs = missingStockData.map(url => url.getURL()).filter(url => url !== null && url !== '');
+        if (URLs.length > MAX_FETCHALL_BATCH_SIZE) {
+            URLs = URLs.slice(0, MAX_FETCHALL_BATCH_SIZE);
+        }
+
+        return URLs;
+    }
+
+    /**
+     * 
+     * @param {StockWebURL[]} missingStockData 
+     * @param {String[]} URLs 
+     * @param {String[]} responses 
+     * @param {String} attribute
+     * @param {Object} bestStockSites
+     */
+    static updateStockResults(missingStockData, URLs, responses, attribute, bestStockSites) {
+        for (let i = 0; i < URLs.length; i++) {
+            const matchingSites = missingStockData.filter(site => site.getURL() === URLs[i]);
+            matchingSites.map(site => site.parseResponse(responses[i], attribute));
+            matchingSites.map(site => site.updateBestSites(bestStockSites, attribute));
+            matchingSites.map(site => site.skipToNextSite());
+        }
+    }
+
+    /**
+     * 
+     * @param {String[]} symbols 
+     * @param {String} attribute 
+     * @param {Object} bestStockSites
+     * @returns {StockWebURL[]}
+     */
+    static getAllStockWebSiteFunctions(symbols, attribute, bestStockSites) {
+        const stockURLs = [];
+        const apiMap = new Map();
+        const siteInfo = new FinanceWebSites();
+        const siteList = siteInfo.get();
+
+        //  Getting this is slow, so save and use later.
+        for (const site of siteList) {
+            apiMap.set(site.siteName, site.siteObject.getApiKey())
+        }
+
+        for (const symbol of symbols) {
+            const stockURL = new StockWebURL(symbol);
+            const bestSite = bestStockSites[CacheFinanceUtils.makeCacheKey(symbol, attribute)];
+
+            for (const site of siteList) {
+                stockURL.addSiteURL(site.siteName, site.siteName === bestSite, site.siteObject.getURL(symbol, attribute, apiMap.get(site.siteName)), site.siteObject.parseResponse);
+            }
+
+            stockURLs.push(stockURL);
+        }
+
+        return stockURLs;
+    }
+
+    /**
+     * 
+     * @returns {Object}
+     */
+    static readBestStockWebsites() {
+        const longCache = new ScriptSettings();
+        let siteObject = longCache.get("CACHE_WEBSITES"); 
+        
+        return siteObject === null ? {} : siteObject;
+    }
+
+    /**
+     * 
+     * @param {Object} siteObject 
+     */
+    static writeBestStockWebsites(siteObject) {
+        const longCache = new ScriptSettings();
+        longCache.put("CACHE_WEBSITES", siteObject, 365);    
+    }
+
+
+    /**
+     * 
+     * @param {String[]} URLs 
+     * @returns {String[]}
+     */
+    static bulkSiteFetch(URLs) {
+        const filteredURLs = URLs.filter(url => url.trim() !== '');
+        const fetchURLs = filteredURLs.map(url => {
+            return {
+                'url': url,
+                'method': 'get',
+                'muteHttpExceptions': true
+            }
+        });
+
+        let dataSet = [];
+        try {
+            const rawSiteData = UrlFetchApp.fetchAll(fetchURLs);
+            dataSet = rawSiteData.map(response => response.getContentText());
+        }
+        catch (ex) {
+            return dataSet;
+        };
+
+        return dataSet;
     }
 
     /**
@@ -516,7 +938,7 @@ class FinanceWebsiteSearch {
 
             // Create small object with needed data for conversion to JSON.
             const searchPlan = planWithData.lookupPlan.createFinanceSiteList();
-            
+
             longCache.put(cacheKey, searchPlan, LOOKUP_PLAN_ACTIVE_DAYS);
             return planWithData;
         }
@@ -563,8 +985,96 @@ class FinanceWebsiteSearch {
         const longCache = new ScriptSettings();
 
         const cacheKey = FinanceWebsiteSearch.makeCacheKey(symbol);
-         
+
         longCache.delete(cacheKey);
+    }
+}
+
+class StockWebURL {
+    constructor (symbol) {
+        this.symbol = symbol;
+        this.siteName = [];
+        this.siteURL = [];
+        this.bestSites = [];
+        this.parseFunction = [];
+        /** @type {StockAttributes} */
+        this.stockAttributes = new StockAttributes();
+        this.siteIterator = 0;
+    }
+
+    /**
+     * 
+     * @param {String} siteName 
+     * @param {String} URL 
+     * @param {Object} parseResponseFunction 
+     * @returns 
+     */
+    addSiteURL(siteName, bestSite, URL, parseResponseFunction) {
+        if (URL.trim() === '') {
+            return;
+        } 
+
+        if (bestSite) {
+            this.siteName.unshift(siteName);
+            this.siteURL.unshift(URL);
+            this.parseFunction.unshift(parseResponseFunction);
+            this.bestSites.unshift(true);
+        }
+        else {
+            this.siteName.push(siteName);
+            this.siteURL.push(URL);
+            this.parseFunction.push(parseResponseFunction);
+            this.bestSites.push(false);
+        }
+    }
+
+    /**
+     * Returns next website URL to be used.
+     * @returns {String}
+     */
+    getURL() {
+        return  this.siteIterator < this.siteURL.length ? this.siteURL[this.siteIterator] : null;  
+    }
+
+    /**
+     * 
+     * @param {String} html 
+     * @param {String} attribute ["PRICE, "NAME, "YIELDPCT"]
+     * @returns {StockAttributes}
+     */
+    parseResponse(html, attribute) {
+        this.stockAttributes = this.siteIterator < this.siteURL.length ? this.parseFunction[this.siteIterator](html, this.symbol, attribute) : null;
+
+        //  Keep track of a website that worked, so we use right away next time.
+        this.bestSites[this.siteIterator] = (this.stockAttributes === null || ! this.stockAttributes.isAttributeSet(attribute)) ? false : true;
+
+        return this.stockAttributes;
+    }
+
+    /**
+     * 
+     * @param {Object} bestStockSites 
+     * @param {String} attribute 
+     */
+    updateBestSites(bestStockSites, attribute) {
+        const key = CacheFinanceUtils.makeCacheKey(this.symbol, attribute);
+        bestStockSites[key] = (this.stockAttributes === null || ! this.stockAttributes.isAttributeSet(attribute)) ? "" : this.siteName[this.siteIterator];
+    }
+
+    /**
+     * Updates internal pointer for next site to be used.
+     * @returns {void}
+     */
+    skipToNextSite() {
+        this.siteIterator++;
+    }
+
+    /**
+     * 
+     * @returns {Boolean}
+     */
+    isSitesDone() {
+        return this.siteIterator >= this.siteName.length;
     }
 }
 
@@ -585,8 +1095,8 @@ class FinanceSiteList {
         this.nameSites = [];
         /** @property {String[]} */
         this.yieldSites = [];
-    } 
-    
+    }
+
     /**
      * 
      * @param {String[]} arr 
@@ -662,9 +1172,9 @@ class FinanceSiteLookupAnalyzer {
         this.nameSites = siteStats.filter(a => a.name !== null);
         this.yieldSites = siteStats.filter(a => a.yield !== null);
 
-        this.priceSites.sort((a,b) => a.timeMs - b.timeMs);
-        this.nameSites.sort((a,b) => a.timeMs - b.timeMs);
-        this.yieldSites.sort((a,b) => a.timeMs - b.timeMs);
+        this.priceSites.sort((a, b) => a.timeMs - b.timeMs);
+        this.nameSites.sort((a, b) => a.timeMs - b.timeMs);
+        this.yieldSites.sort((a, b) => a.timeMs - b.timeMs);
     }
 
 
@@ -708,7 +1218,7 @@ class FinanceSiteLookupAnalyzer {
                 siteArr = stockSites.priceSites;
                 break;
         }
-        
+
         return FinanceSiteLookupAnalyzer.getAttributeDataFromSite(stockSites.symbol, siteArr, attribute);
     }
 
@@ -731,18 +1241,18 @@ class FinanceSiteLookupAnalyzer {
             }
 
             try {
-              data = siteFunction.siteObject.getInfo(symbol, attribute);
+                data = siteFunction.siteObject.getInfo(symbol, attribute);
             }
-            catch(ex) {
-              Logger.log(`No SITE Object.  Symbol=${symbol}. Attrib=${attribute}. Site=${site}`);
-            }            
+            catch (ex) {
+                Logger.log(`No SITE Object.  Symbol=${symbol}. Attrib=${attribute}. Site=${site}`);
+            }
 
             if (data?.isAttributeSet(attribute)) {
                 return data;
             }
-        }  
-        
-        return data;        
+        }
+
+        return data;
     }
 }
 
@@ -1061,12 +1571,12 @@ class FinanceWebSites {
      */
     constructor() {
         this.siteList = [
-            new FinanceWebSite("FinnHub", FinnHub),
-            new FinanceWebSite("AlphaVantage", AlphaVantage),
+            new FinanceWebSite("FinnHub", FinnHub),           
             new FinanceWebSite("TDEtf", TdMarketsEtf),
             new FinanceWebSite("TDStock", TdMarketsStock),
+            new FinanceWebSite("Globe", GlobeAndMail),
             new FinanceWebSite("Yahoo", YahooFinance),
-            new FinanceWebSite("Globe", GlobeAndMail)
+            new FinanceWebSite("AlphaVantage", AlphaVantage)
         ];
 
         /** @property {Map<String, FinanceWebSite>} */
@@ -1174,7 +1684,7 @@ class FinanceWebSite {
      */
     constructor(siteName, webSiteJsClass) {
         this.siteName = siteName.toUpperCase();
-        this.siteObject = webSiteJsClass;
+        this._siteObject = webSiteJsClass;
     }
 
     set siteName(siteName) {
@@ -1184,10 +1694,10 @@ class FinanceWebSite {
         return this._siteName;
     }
 
-    set webSiteClass(siteObject) {
+    set siteObject(siteObject) {
         this._siteObject = siteObject;
     }
-    get webSiteClass() {
+    get siteObject() {
         return this._siteObject;
     }
 }
@@ -1235,13 +1745,13 @@ class StockAttributes {
     getValue(attribute) {
         switch (attribute) {
             case "PRICE":
-                return (this.stockPrice === null) ? 0 : this.stockPrice;
+                return (this.stockPrice === null) ? '' : this.stockPrice;
 
             case "YIELDPCT":
-                return (this.yieldPct === null) ? 0 : this.yieldPct;
+                return (this.yieldPct === null) ? '' : this.yieldPct;
 
             case "NAME":
-                return (this.stockName === null) ? "" : this.stockName;
+                return (this.stockName === null) ? '' : this.stockName;
 
             default:
                 return '#N/A';
@@ -1256,7 +1766,7 @@ class StockAttributes {
     isAttributeSet(attribute) {
         switch (attribute) {
             case "PRICE":
-                return this.stockPrice !== null;
+                return this.stockPrice !== null && this.stockPrice !== 0;
 
             case "YIELDPCT":
                 return this.yieldPct !== null;
@@ -1286,6 +1796,29 @@ class TdMarketsEtf {
 
     /**
      * 
+     * @param {String} symbol 
+     * @returns {String}
+     */
+    static getURL(symbol, attribute) {
+        return TdMarketResearch.getURL(symbol, "ETF");
+    }
+
+    static getApiKey() {
+        return "";    
+    }
+
+    /**
+      * 
+      * @param {String} html 
+      * @param {String} symbol
+      * @returns {StockAttributes}
+      */
+    static parseResponse(html, symbol) {
+        return TdMarketResearch.parseResponse(html);
+    }
+
+    /**
+     * 
      * @param {String} key 
      * @param {any} defaultValue 
      * @returns {any}
@@ -1311,6 +1844,29 @@ class TdMarketsStock {
 
     /**
      * 
+     * @param {String} symbol 
+     * @returns {String}
+     */
+    static getURL(symbol, attribute) {
+        return TdMarketResearch.getURL(symbol, "STOCK");
+    }
+
+    static getApiKey() {
+        return "";    
+    }
+
+    /**
+      * 
+      * @param {String} html 
+      * @param {String} symbol
+      * @returns {StockAttributes}
+      */
+    static parseResponse(html, symbol) {
+        return TdMarketResearch.parseResponse(html);
+    }
+
+    /**
+     * 
      * @param {String} key 
      * @param {any} defaultValue 
      * @returns {any}
@@ -1332,23 +1888,43 @@ class TdMarketResearch {
      * @returns {StockAttributes}
      */
     static getInfo(symbol, attribute, type = "ETF") {
-        const data = new StockAttributes();
-
-        let URL = null;
-        if (type === "ETF")
-            URL = `https://marketsandresearch.td.com/tdwca/Public/ETFsProfile/Summary/${FinanceWebSites.getTickerCountryCode(symbol)}/${TdMarketResearch.getTicker(symbol)}`;
-        else
-            URL = `https://marketsandresearch.td.com/tdwca/Public/Stocks/Overview/${FinanceWebSites.getTickerCountryCode(symbol)}/${TdMarketResearch.getTicker(symbol)}`;
+        const URL = TdMarketResearch.getURL(symbol, type);
 
         let html = null;
         try {
             html = UrlFetchApp.fetch(URL).getContentText();
         }
         catch (ex) {
-            return data;
+            return new StockAttributes();
         }
-        Logger.log(`getInfo:  ${symbol}`);
-        Logger.log(`URL = ${URL}`);
+        Logger.log(`getInfo:  ${symbol}.  URL = ${URL}`);
+
+        return TdMarketResearch.parseResponse(html);
+    }
+
+    /**
+     * 
+     * @param {String} symbol 
+     * @param {String} type 
+     * @returns {String}
+     */
+    static getURL(symbol, type = "ETF") {
+        let URL = null;
+        if (type === "ETF")
+            URL = `https://marketsandresearch.td.com/tdwca/Public/ETFsProfile/Summary/${FinanceWebSites.getTickerCountryCode(symbol)}/${TdMarketResearch.getTicker(symbol)}`;
+        else
+            URL = `https://marketsandresearch.td.com/tdwca/Public/Stocks/Overview/${FinanceWebSites.getTickerCountryCode(symbol)}/${TdMarketResearch.getTicker(symbol)}`;
+
+        return URL;
+    }
+
+    /**
+     * 
+     * @param {String} html 
+     * @returns {StockAttributes}
+     */
+    static parseResponse(html) {
+        const data = new StockAttributes();
 
         //  Get the dividend yield.
 
@@ -1417,20 +1993,52 @@ class YahooFinance {
      * @returns {StockAttributes}
      */
     static getInfo(symbol) {
-        const data = new StockAttributes();
-
-        const URL = `https://finance.yahoo.com/quote/${YahooFinance.getTicker(symbol)}`;
+        const URL = YahooFinance.getURL(symbol);
 
         let html = null;
         try {
             html = UrlFetchApp.fetch(URL).getContentText();
         }
         catch (ex) {
-            return data;
+            return new StockAttributes();
         }
 
-        Logger.log(`getInfo:  ${symbol}`);
-        Logger.log(`URL = ${URL}`);
+        Logger.log(`getInfo:  ${symbol}.  URL = ${URL}`);
+
+        return YahooFinance.parseResponse(html, symbol);
+    }
+
+    /**
+     * 
+     * @param {String} symbol 
+     * @param {String} [attribute]
+     * @returns {String}
+     */
+    static getURL(symbol, attribute) {
+        const countryCode = FinanceWebSites.getTickerCountryCode(symbol);
+        if (countryCode !== "us") {
+            return "";
+        }
+
+        return `https://finance.yahoo.com/quote/${YahooFinance.getTicker(symbol)}`;
+    }
+
+    static getApiKey() {
+        return "";    
+    }
+
+    /**
+     * 
+     * @param {String} html 
+     * @param {String} symbol
+     * @returns {StockAttributes}
+     */
+    static parseResponse(html, symbol) {
+        const data = new StockAttributes();
+
+        if (symbol === '') {
+            return data;
+        }
 
         let dividendPercent = html.match(/"DIVIDEND_AND_YIELD-value">\d*\.\d*\s\((\d*\.\d*)%\)/);
         if (dividendPercent === null) {
@@ -1439,7 +2047,7 @@ class YahooFinance {
 
         if (dividendPercent !== null && dividendPercent.length === 2) {
             const tempPct = dividendPercent[1];
-            Logger.log(`PERCENT=${tempPct}`);
+            Logger.log(`Yahoo. Stock=${symbol}. PERCENT=${tempPct}`);
 
             data.yieldPct = parseFloat(tempPct) / 100;
 
@@ -1455,7 +2063,7 @@ class YahooFinance {
 
         if (priceMatch !== null && priceMatch.length === 2) {
             const tempPrice = priceMatch[1];
-            Logger.log(`PRICE=${tempPrice}`);
+            Logger.log(`Yahoo. Stock=${symbol}.PRICE=${tempPrice}`);
 
             data.stockPrice = parseFloat(tempPrice);
 
@@ -1508,19 +2116,42 @@ class GlobeAndMail {
      * @returns {StockAttributes}
      */
     static getInfo(symbol) {
-        const data = new StockAttributes();
-        const URL = `https://www.theglobeandmail.com/investing/markets/stocks/${GlobeAndMail.getTicker(symbol)}`;
+        const URL = GlobeAndMail.getURL(symbol);
 
-        Logger.log(`getInfo:  ${symbol}`);
-        Logger.log(`URL = ${URL}`);
+        Logger.log(`getInfo:  ${symbol}.  URL = ${URL}`);
 
         let html = null;
         try {
             html = UrlFetchApp.fetch(URL).getContentText();
         }
         catch (ex) {
-            return data;
+            return new StockAttributes();
         }
+
+        return GlobeAndMail.parseResponse(html);
+    }
+
+    /**
+     * 
+     * @param {String} symbol 
+     * @param {String} [attribute]
+     * @returns {String}
+     */
+    static getURL(symbol, attribute) {
+        return `https://www.theglobeandmail.com/investing/markets/stocks/${GlobeAndMail.getTicker(symbol)}`;
+    }
+
+    static getApiKey() {
+        return "";    
+    }
+
+    /**
+     * 
+     * @param {String} html 
+     * @returns {StockAttributes}
+     */
+    static parseResponse(html) {
+        const data = new StockAttributes();
 
         //  Get the dividend yield.
         let parts = html.match(/.name="dividendYieldTrailing".*?value="(\d{0,4}\.?\d{0,4})%/);
@@ -1612,7 +2243,6 @@ class GlobeAndMail {
  * Set key name as FINNHUB_API_KEY
  */
 class FinnHub {
-
     /**
      * 
      * @param {String} symbol 
@@ -1620,13 +2250,7 @@ class FinnHub {
      * @returns 
      */
     static getInfo(symbol, attribute = "PRICE") {
-        const data = new StockAttributes();
-        const API_KEY = FinanceWebSites.getApiKey("FINNHUB_API_KEY");
-
-        if (API_KEY === null) {
-            Logger.log("No FinnHub API Key.");
-            return data;
-        }
+        let data = new StockAttributes();
 
         if (attribute !== "PRICE") {
             Logger.log(`Finnhub.  Only PRICE is supported: ${symbol}, ${attribute}`);
@@ -1639,21 +2263,63 @@ class FinnHub {
             return data;
         }
 
-        const URL = `https://finnhub.io/api/v1/quote?symbol=${FinanceWebSites.getBaseTicker(symbol)}&token=${API_KEY}`;
+        const URL = FinnHub.getURL(symbol, attribute, FinnHub.getApiKey());
         Logger.log(`getInfo:  ${symbol}`);
         Logger.log(`URL = ${URL}`);
 
         let jsonStr = null;
         try {
             jsonStr = UrlFetchApp.fetch(URL).getContentText();
-
-            const hubData = JSON.parse(jsonStr);
-            data.stockPrice = hubData.c;
-            Logger.log(hubData);
+            data = FinnHub.parseResponse(jsonStr);
         }
         catch (ex) {
             return data;
         }
+
+        return data;
+    }
+
+    /**
+     * 
+     * @param {String} symbol 
+     * @param {String} attribute
+     * @param {String} API_KEY
+     * @returns {String}
+     */
+    static getURL(symbol, attribute, API_KEY=null) {
+        if (attribute !== "PRICE") {
+            return "";
+        }
+
+        const countryCode = FinanceWebSites.getTickerCountryCode(symbol);
+        if (countryCode !== "us") {
+            return "";
+        }
+
+        if (API_KEY === null) {
+            return "";
+        }
+
+        return `https://finnhub.io/api/v1/quote?symbol=${FinanceWebSites.getBaseTicker(symbol)}&token=${API_KEY}`;
+    }
+
+    static getApiKey() {
+        return FinanceWebSites.getApiKey("FINNHUB_API_KEY");    
+    }
+
+    /**
+     * 
+     * @param {String} jsonStr 
+     * @param {String} symbol
+     * @param {String} attribute
+     * @returns {StockAttributes}
+     */
+    static parseResponse(jsonStr, symbol, attribute) {
+        const data = new StockAttributes();
+
+        const hubData = JSON.parse(jsonStr);
+        if (attribute === "PRICE")
+            data.stockPrice = hubData.c;
 
         return data;
     }
@@ -1670,21 +2336,14 @@ class FinnHub {
 }
 
 class AlphaVantage {
-
     /**
      * 
      * @param {String} symbol 
      * @param {String} attribute 
-     * @returns 
+     * @returns {StockAttributes}
      */
     static getInfo(symbol, attribute = "PRICE") {
-        const data = new StockAttributes();
-        const API_KEY = FinanceWebSites.getApiKey("ALPHA_VANTAGE_API_KEY");
-
-        if (API_KEY === null) {
-            Logger.log("No AlphaVantage API Key.");
-            return data;
-        }
+        let data = new StockAttributes();
 
         if (attribute !== "PRICE") {
             Logger.log(`AlphaVantage.  Only PRICE is supported: ${symbol}, ${attribute}`);
@@ -1697,21 +2356,65 @@ class AlphaVantage {
             return data;
         }
 
-        const URL = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${FinanceWebSites.getBaseTicker(symbol)}&apikey=${API_KEY}`;
-        Logger.log(`getInfo:  ${symbol}`);
-        Logger.log(`URL = ${URL}`);
+        const URL = AlphaVantage.getURL(symbol, attribute, AlphaVantage.getApiKey());
+        Logger.log(`getInfo:  ${symbol}.  URL = ${URL}`);
 
         let jsonStr = null;
         try {
             jsonStr = UrlFetchApp.fetch(URL).getContentText();
-
-            const alphaVantageData = JSON.parse(jsonStr);
-            data.stockPrice = alphaVantageData["Global Quote"]["05. price"];
-            Logger.log(`content=${jsonStr}`);
-            Logger.log(`Price=${data.stockPrice}`);
+            data = AlphaVantage.parseResponse(jsonStr);
         }
         catch (ex) {
             return data;
+        }
+
+        return data;
+    }
+
+    /**
+     * 
+     * @param {String} symbol 
+     * @param {String} attribute
+     * @param {String} API_KEY
+     * @returns {String}
+     */
+    static getURL(symbol, attribute, API_KEY=null) {
+        if (API_KEY === null) {
+            return "";
+        }
+
+        if (attribute !== "PRICE") {
+            return "";
+        }
+
+        const countryCode = FinanceWebSites.getTickerCountryCode(symbol);
+        if (countryCode !== "us") {
+            return "";
+        }
+
+        return `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${FinanceWebSites.getBaseTicker(symbol)}&apikey=${API_KEY}`;
+    }
+
+    static getApiKey() {
+        return FinanceWebSites.getApiKey("ALPHA_VANTAGE_API_KEY");    
+    }
+
+    /**
+     * 
+     * @param {String} jsonStr 
+     * @returns {StockAttributes}
+     */
+    static parseResponse(jsonStr) {
+        const data = new StockAttributes();
+
+        Logger.log(`content=${jsonStr}`);
+        try {
+            const alphaVantageData = JSON.parse(jsonStr);
+            data.stockPrice = alphaVantageData["Global Quote"]["05. price"];
+            Logger.log(`Price=${data.stockPrice}`);
+        }
+        catch (ex) {
+            Logger.log("AlphaVantage JSON Parse Error.");
         }
 
         return data;
@@ -1725,6 +2428,207 @@ class AlphaVantage {
      */
     static getPropertyValue(key, defaultValue) {
         return defaultValue;
+    }
+}
+
+class CacheFinanceUtils {
+    /**
+     * 
+     * @param {String[]} symbols 
+     * @param {String} attribute 
+     */
+    static bulkShortCacheRemoveAll(symbols, attribute) {
+        const cacheKeyList = CacheFinanceUtils.createCacheKeyList(symbols, attribute);
+        CacheService.getScriptCache().removeAll(cacheKeyList);
+    }
+
+    /**
+     * 
+     * @param {any[]} symbols 
+     * @param {String} attribute 
+     * @returns {any[]} 
+     */
+    static bulkShortCacheGet(symbols, attribute) {
+        const cacheKeyList = CacheFinanceUtils.createCacheKeyList(symbols, attribute);
+        return CacheFinanceUtils.getFinanceValuesFromShortCache(cacheKeyList);
+    }
+
+    /**
+     * 
+     * @param {any[]} symbols 
+     * @param {String} attribute 
+     * @param {any[]} newCacheData 
+     */
+    static bulkShortCachePut(symbols, attribute, newCacheData, cacheSeconds) {
+        if (symbols.length === 0) {
+            return;
+        }
+
+        const cacheKeyList = CacheFinanceUtils.createCacheKeyList(symbols, attribute);
+        CacheFinanceUtils.putFinanceValuesIntoShortCache(cacheKeyList, newCacheData, cacheSeconds);
+    }
+
+    /**
+     * 
+     * @param {any[]} symbols 
+     * @param {String} attribute 
+     * @param {any[]} cacheData 
+     */
+    static bulkLongCachePut(symbols, attribute, cacheData, daysToHold=7) {
+        const cacheKeys = CacheFinanceUtils.createCacheKeyList(symbols, attribute);
+        const newCacheKeys = [];
+        const newCacheData = [];
+
+        for (let i = 0; i < cacheKeys.length; i++) {
+            if (CacheFinanceUtils.isValidGoogleValue(cacheData[i])) {
+                newCacheKeys.push(cacheKeys[i]);
+                newCacheData.push(cacheData[i])
+            }
+        }
+
+        ScriptSettings.putAllKeysWithData(newCacheKeys, newCacheData, daysToHold);
+    }
+
+    /**
+     * 
+     * @param {String[]} symbols 
+     * @param {String} attribute 
+     * @returns {any[]}
+     */
+    static bulkLongCacheGet(symbols, attribute) {
+        const cacheKeyList = CacheFinanceUtils.createCacheKeyList(symbols, attribute);
+        return ScriptSettings.getAll(cacheKeyList);
+    }
+
+    /**
+     * 
+     * @param {String[]} symbols 
+     * @param {String} attribute 
+     * @returns {String[]}
+     */
+    static createCacheKeyList(symbols, attribute) {
+        return symbols.map(symbol => CacheFinanceUtils.makeCacheKey(symbol.toUpperCase(), attribute));
+    }
+
+    /**
+     * 
+     * @param {String[]} cacheKeys 
+     * @returns {any[]} - A missing cache entry will return 'null'
+     */
+    static getFinanceValuesFromShortCache(cacheKeys) {
+        const shortCache = CacheService.getScriptCache();
+
+        //  Object with key/value pairs for all items found in cache.
+        const data = shortCache.getAll(cacheKeys);
+        const cachedDataList = [];
+
+        for (const key of cacheKeys) {
+            let parsedData = null;
+            if (typeof data[key] !== 'undefined') {
+                parsedData = JSON.parse(data[key]);
+            }
+            cachedDataList.push(parsedData);
+        }
+
+        return cachedDataList;
+    }
+
+    /**
+     * Puts list of data into cache using one API call.  Data is converted to JSON before it is updated.
+     * @param {String[]} cacheKeys 
+     * @param {any[]} newCacheData 
+     * @param {Number} cacheSeconds
+     */
+    static putFinanceValuesIntoShortCache(cacheKeys, newCacheData, cacheSeconds = 21600) {
+        const bulkData = {};
+
+        for (let i = 0; i < cacheKeys.length; i++) {
+            if (CacheFinanceUtils.isValidGoogleValue(newCacheData[i])) {
+                bulkData[cacheKeys[i]] = JSON.stringify(newCacheData[i]);
+            }
+        }
+
+        const shortCache = CacheService.getScriptCache();
+        shortCache.putAll(bulkData, cacheSeconds);
+    }
+
+    /**
+     * Puts list of data into cache using one API call.  Data is converted to JSON before it is updated.
+     * @param {String[]} cacheKeys 
+     * @param {any[]} cacheData 
+     * @param {Number} daysToHold
+     */
+    static putFinanceValuesIntoLongCache(cacheKeys, cacheData, daysToHold = 7) {
+        const newCacheKeys = [];
+        const newCacheData = [];
+
+        for (let i = 0; i < cacheKeys.length; i++) {
+            if (CacheFinanceUtils.isValidGoogleValue(cacheData[i])) {
+                newCacheKeys.push(cacheKeys[i]);
+                newCacheData.push(cacheData[i])
+            }
+        }
+
+        ScriptSettings.putAllKeysWithData(newCacheKeys, newCacheData, daysToHold);
+    }
+
+    /**
+     * 
+     * @param {String} symbol 
+     * @param {String} attribute 
+     * @returns {String}
+     */
+    static makeCacheKey(symbol, attribute) {
+        return `${attribute}|${symbol}`;
+    }
+
+    /**
+     * It is common to have extra empty records loaded at end of table.
+     * Remove those empty records at END of table only.
+     * @param {any[][]} tableData 
+     * @returns {any[][]}
+     */
+    static removeEmptyRecordsAtEndOfTable(tableData) {
+        if (!Array.isArray(tableData)) {
+            return tableData;
+        }
+
+        let blankLines = 0;
+        for (let i = tableData.length - 1; i > 0; i--) {
+            if (tableData[i].join().replace(/,/g, "").length > 0)
+                break;
+            blankLines++;
+        }
+
+        return tableData.slice(0, tableData.length - blankLines);
+    }
+
+    /**
+     * 
+     * @param {any} value 
+     * @returns {Boolean}
+     */
+    static isValidGoogleValue(value) {
+        return value !== null && typeof value !== 'undefined' && value !== "#N/A" && value !== '#ERROR!' && value !== '';
+    }
+
+    //  When you request a single column of data from getRange(), it is still a double array.
+    //  Convert to single array for reguar array processing.
+    static convertRowsToSingleArray(doubleArray) {
+        if (! Array.isArray(doubleArray)) {
+            return doubleArray;
+        }
+    
+        return doubleArray.map(item => item[0]);
+    }
+
+    /**
+     * 
+     * @param {any[]} singleArray 
+     * @returns {any[][]}
+     */
+    static convertSingleToDoubleArray(singleArray) {
+        return singleArray.map(item => [item]);
     }
 }
 

@@ -2,6 +2,7 @@
 //  Remove comments for testing in NODE
 
 import { CACHEFINANCE, CacheFinance, GOOGLEFINANCE_PARAM_NOT_USED } from "./CacheFinance";
+import { CacheFinanceUtils } from "./CacheFinanceUtils";
 
 class Logger {
     static log(msg) {
@@ -34,8 +35,8 @@ function testBulkCache() {                      // skipcq: JS-0128
     const symbols = [["ABC"], ["DEF"], ["GHI"], ["JKL"], ["MNO"]];
     const data = [11.1, 22.2, 33.3, 44.4, 55.5];
 
-    CacheTrigger.bulkCachePut(symbols, "PRICE", data);
-    const cacheData = CacheTrigger.bulkCacheGet(symbols, "PRICE");
+    CacheFinanceUtils.bulkShortCachePut(symbols, "PRICE", data);
+    const cacheData = CacheFinanceUtils.bulkShortCacheGet(symbols, "PRICE");
 
     if (JSON.stringify(data) !== JSON.stringify(cacheData)) {
         Logger.log("BULK Cache TEST Fail.");
@@ -220,7 +221,7 @@ class CacheJobSettings {
             return;
         }
 
-        const key = CacheFinance.makeCacheKey("ALIVE", e.triggerUid);
+        const key = CacheFinanceUtils.makeCacheKey("ALIVE", e.triggerUid);
         const shortCache = CacheService.getScriptCache();
         if (alive) {
             shortCache.put(key, "ALIVE");
@@ -274,7 +275,7 @@ class CacheJobSettings {
     static isDisabledTriggerStillRunning(triggerID) {
         const shortCache = CacheService.getScriptCache();
 
-        const key = CacheFinance.makeCacheKey("ALIVE", triggerID);
+        const key = CacheFinanceUtils.makeCacheKey("ALIVE", triggerID);
         if (shortCache.get(key) !== null) {
             Logger.log(`Trigger ID=${triggerID} is RUNNING!`);
             return true;
@@ -339,7 +340,7 @@ class CacheJobSettings {
 
         if (job.timeout) {
             const savedPartialResults = JSON.stringify(job.jobData);
-            const key = CacheFinance.makeCacheKey("RESUMEJOB", job.triggerID);
+            const key = CacheFinanceUtils.makeCacheKey("RESUMEJOB", job.triggerID);
             const shortCache = CacheService.getScriptCache();
             shortCache.put(key, savedPartialResults, 300);
             Logger.log(`Saving PARTIAL RESULTS.  Key=${key}. Items=${job.jobData.length}`);
@@ -393,7 +394,7 @@ class CacheJobSettings {
         }
         else {
             //  Is this a continuation job?
-            const key = CacheFinance.makeCacheKey("RESUMEJOB", myJob.triggerID);
+            const key = CacheFinanceUtils.makeCacheKey("RESUMEJOB", myJob.triggerID);
             const shortCache = CacheService.getScriptCache();
             const resumeData = shortCache.get(key);
             if (resumeData !== null) {
@@ -879,7 +880,7 @@ class CacheTrigger {
         const attribute = jobSettings.attribute;
         const symbols = CacheTrigger.getSymbols(jobSettings);
         const defaultData = CacheTrigger.getDefaultData(jobSettings);
-        const bulkDataCache = CacheTrigger.bulkCacheGet(symbols, attribute);
+        const bulkDataCache = CacheFinanceUtils.bulkShortCacheGet(symbols, attribute);
 
         Logger.log(`CacheTrigger: Symbols:${jobSettings.symbolRange}. Attribute:${jobSettings.attribute}. GoogleRange: ${jobSettings.defaultRange}`);
 
@@ -982,82 +983,5 @@ class CacheTrigger {
         return true;
     }
 
-    /**
-     * 
-     * @param {any[][]} symbols 
-     * @param {String} attribute 
-     * @returns {any[]} 
-     */
-    static bulkCacheGet(symbols, attribute) {
-        const cacheKeyList = CacheTrigger.createCacheKeyList(symbols, attribute);
-        return CacheTrigger.getFinanceValuesFromShortCache(cacheKeyList);
-    }
 
-    /**
-     * 
-     * @param {any[][]} symbols 
-     * @param {String} attribute 
-     * @param {any[]} newCacheData 
-     */
-    static bulkCachePut(symbols, attribute, newCacheData) {
-        const cacheKeyList = CacheTrigger.createCacheKeyList(symbols, attribute);
-        CacheTrigger.putFinanceValuesIntoShortCache(cacheKeyList, newCacheData);
-    }
-
-    /**
-     * 
-     * @param {any[][]} symbols 
-     * @param {String} attribute 
-     * @returns {any[]}
-     */
-    static createCacheKeyList(symbols, attribute) {
-        const cacheKeyList = [];
-        for (const symbol of symbols) {
-            attribute = attribute.toUpperCase().trim();
-            const upperCaseSymbol = symbol[0].toUpperCase();
-            const cacheKey = CacheFinance.makeCacheKey(upperCaseSymbol, attribute.toUpperCase().trim());
-            cacheKeyList.push(cacheKey);
-        }
-
-        return cacheKeyList;
-    }
-
-    /**
-     * 
-     * @param {String[]} cacheKeys 
-     * @returns {any[]}
-     */
-    static getFinanceValuesFromShortCache(cacheKeys) {
-        const shortCache = CacheService.getScriptCache();
-
-        //  Object with key/value pairs for all items found in cache.
-        const data = shortCache.getAll(cacheKeys);
-        const cachedDataList = [];
-
-        for (const key of cacheKeys) {
-            let parsedData = null;
-            if (typeof data[key] !== 'undefined') {
-                parsedData = JSON.parse(data[key]);
-            }
-            cachedDataList.push(parsedData);
-        }
-
-        return cachedDataList;
-    }
-
-    /**
-     * Puts list of data into cache using one API call.  Data is converted to JSON before it is updated.
-     * @param {String[]} cacheKeys 
-     * @param {any[]} newCacheData 
-     */
-    static putFinanceValuesIntoShortCache(cacheKeys, newCacheData) {
-        const bulkData = {};
-
-        for (let i = 0; i < cacheKeys.length; i++) {
-            bulkData[cacheKeys[i]] = JSON.stringify(newCacheData[i]);
-        }
-
-        const shortCache = CacheService.getScriptCache();
-        shortCache.putAll(bulkData, 21600);
-    }
 }

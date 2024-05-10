@@ -1,7 +1,14 @@
 /*  *** DEBUG START ***
 //  Remove comments for testing in NODE
-export { ScriptSettings };
+export { ScriptSettings, PropertyData };
 import { PropertiesService } from "../GasMocks.js";
+
+class Logger {
+    static log(msg) {
+        console.log(msg);
+    }
+}
+
 //  *** DEBUG END ***/
 
 /** @classdesc 
@@ -63,31 +70,96 @@ class ScriptSettings {      //  skipcq: JS-0128
     }
 
     /**
+     * Puts list of data into cache using one API call.  Data is converted to JSON before it is updated.
+     * @param {String[]} cacheKeys 
+     * @param {any[]} newCacheData 
+     * @param {Number} daysToHold
+     */
+    static putAllKeysWithData(cacheKeys, newCacheData, daysToHold = 7) {
+        const bulkData = {};
+
+        for (let i = 0; i < cacheKeys.length; i++) {
+            //  Create our object with an expiry time.
+            const objData = new PropertyData(newCacheData[i], daysToHold);
+
+            //  Our property needs to be a string
+            bulkData[cacheKeys[i]] = JSON.stringify(objData);
+        }
+
+        PropertiesService.getScriptProperties().setProperties(bulkData);
+    }
+
+    /**
+     * Returns ALL cached data for each key value requested. 
+     * Only 1 API call is made, so much faster than retrieving single values.
+     * @param {String[]} cacheKeys 
+     * @returns {any[]}
+     */
+    static getAll(cacheKeys) {
+        const values = [];
+        const allProperties = PropertiesService.getScriptProperties().getProperties();
+
+        //  Removing properties is very slow, so remove only 1 at a time.  This is enough as this function is called frequently.
+        ScriptSettings.expire(false, 1, allProperties);
+
+        for (const key of cacheKeys) {
+            const myData = allProperties[key];
+
+            if (typeof myData === 'undefined') {
+                values.push(null);
+            }
+            else {
+                /** @type {PropertyData} */
+                const myPropertyData = JSON.parse(myData);
+
+                if (PropertyData.isExpired(myPropertyData)) {
+                    values.push(null);
+                    PropertiesService.getScriptProperties().deleteProperty(key);
+                    Logger.log(`Delete expired Script Property Key=${key}`);
+                }
+                else {
+                    values.push(PropertyData.getData(myPropertyData));
+                }
+            }
+        }
+
+        return values;
+    }
+
+    /**
      * Removes script settings that have expired.
      * @param {Boolean} deleteAll - true - removes ALL script settings regardless of expiry time.
+     * @param {Number} maxDelete - maximum number of items to delete that are expired.
+     * @param {Object} allPropertiesObject - All properties already loaded.  If null, will load iteself.
      */
-    expire(deleteAll) {
-        const allKeys = this.scriptProperties.getKeys();
+    static expire(deleteAll, maxDelete = 999, allPropertiesObject = null) {
+        const allProperties = allPropertiesObject === null ? PropertiesService.getScriptProperties().getProperties() : allPropertiesObject;
+        const allKeys = Object.keys(allProperties);
+        let deleteCount = 0;
 
         for (const key of allKeys) {
-            const myData = this.scriptProperties.getProperty(key);
+            let propertyValue = null;
+            try {
+                propertyValue = JSON.parse(allProperties[key]);
+            }
+            catch (e) {
+                //  A property that is NOT cached by CACHEFINANCE
+                continue;
+            }
 
-            if (myData !== null) {
-                let propertyValue = null;
-                try {
-                    propertyValue = JSON.parse(myData);
-                }
-                catch (e) {
-                    Logger.log(`Script property data is not JSON. key=${key}`);
-                    continue;
-                }
+            const propertyOfThisApplication = propertyValue?.expiry !== undefined;
 
-                const propertyOfThisApplication = propertyValue?.expiry !== undefined;
+            if (propertyOfThisApplication && (PropertyData.isExpired(propertyValue) || deleteAll)) {
+                PropertiesService.getScriptProperties().deleteProperty(key);
+                delete allProperties[key];
 
-                if (propertyOfThisApplication && (PropertyData.isExpired(propertyValue) || deleteAll)) {
-                    this.scriptProperties.deleteProperty(key);
-                    Logger.log(`Removing expired SCRIPT PROPERTY: key=${key}`);
-                }
+                Logger.log(`Removing expired SCRIPT PROPERTY: key=${key}`);
+
+                deleteCount++;
+            }
+
+            if (deleteCount >= maxDelete) {
+                return;
             }
         }
     }
@@ -129,9 +201,7 @@ class PropertyData {
     static getData(obj) {
         let value = null;
         try {
-            if (!PropertyData.isExpired(obj)) {
-                value = JSON.parse(obj.myData);
-            }
+            value = JSON.parse(obj.myData);
         }
         catch (ex) {
             Logger.log(`Invalid property value.  Not JSON: ${ex.toString()}`);

@@ -5,7 +5,8 @@ import { ScriptSettings } from "./SQL/ScriptSettings.js";
 import { ThirdPartyFinance } from "./CacheFinance3rdParty.js";
 import { cacheFinanceTest } from "./CacheFinanceTest.js";
 import { StockAttributes } from "./CacheFinanceWebSites.js";
-import { CacheService } from "./GasMocks.js";
+import { CacheService, SpreadsheetApp } from "./GasMocks.js";
+import { CacheFinanceUtils } from "./CacheFinanceUtils.js";
 export { CACHEFINANCE, CacheFinance, GOOGLEFINANCE_PARAM_NOT_USED };
 
 class Logger {
@@ -22,6 +23,20 @@ const GOOGLEFINANCE_PARAM_NOT_USED = "##NotSet##";
 function testYieldPct() {
     const val = CACHEFINANCE("TSE:FTN-A", "yieldpct");        // skipcq: JS-0128
     Logger.log(`Test CacheFinance FTN-A(yieldpct)=${val}`);
+}
+
+function testCacheFinances() {
+    // const symbols = [["ABC"], ["DEF"], ["GHI"], ["JKL"], ["TSE:FLJA"]];
+    // const data = [[11.1], [22.2], [33.3], [44.4], ["#N/A"]];
+
+    let symbols = SpreadsheetApp.getActiveSpreadsheet().getRangeByName("A30:A165").getValues();
+    const data = SpreadsheetApp.getActiveSpreadsheet().getRangeByName("E30:E165").getValues();
+
+    const cacheData = CACHEFINANCES(symbols, "PRICE", data);
+
+    let singleSymbols = CacheFinanceUtils.convertRowsToSingleArray(symbols);
+
+    Logger.log("BULK CACHE TEST Success");
 }
 
 /**
@@ -43,8 +58,7 @@ function CACHEFINANCE(symbol, attribute = "price", googleFinanceValue = GOOGLEFI
     }
 
     if (attribute.toUpperCase() === "CLEARCACHE") {
-        const ss = new ScriptSettings();
-        ss.expire(true);
+        ScriptSettings.expire(true);
         return 'Cache Cleared';
     }
 
@@ -57,6 +71,51 @@ function CACHEFINANCE(symbol, attribute = "price", googleFinanceValue = GOOGLEFI
     }
 
     return CacheFinance.getFinanceData(symbol, attribute, googleFinanceValue);
+}
+
+/**
+ * Bulk cache retrieval of finance data for updating large quantity of stock attributes.
+ * @param {String[][]} symbols 
+ * @param {String} attribute - ["price", "yieldpct", "name"]
+ * @param {any[][]} defaultValues Default values from GoogleFinance()
+ * @param {Number} webSiteLookupCacheSeconds Min. time between Web Lookups (max 21600 seconds)
+ * @returns 
+ * @customfunction
+ */
+function CACHEFINANCES(symbols, attribute = "price", defaultValues = [], webSiteLookupCacheSeconds = -1) {         // skipcq: JS-0128
+    if (!Array.isArray(symbols)) {
+        throw new Error("Expecting list of stock symbols.");
+    }
+
+    if (Array.isArray(symbols) && Array.isArray(defaultValues) && defaultValues.length > 0 && symbols.length !== defaultValues.length) {
+        throw new Error("Stock symbol RANGE must match default values range.");
+    }
+
+    const trimmedSymbols = CacheFinanceUtils.removeEmptyRecordsAtEndOfTable(symbols);
+    const trimmedValues = CacheFinanceUtils.removeEmptyRecordsAtEndOfTable(defaultValues);
+
+    //  Data ranges from sheets are double arrays.  Just make life simple and convert to single array.
+    const newSymbols = CacheFinanceUtils.convertRowsToSingleArray(trimmedSymbols);
+    const newValues = CacheFinanceUtils.convertRowsToSingleArray(trimmedValues);
+
+    attribute = attribute.toUpperCase().trim();
+    if (attribute === "CLEARCACHE") {
+        ScriptSettings.expire(true);
+        return 'Long Cache Cleared';
+    }
+
+    if (typeof newValues === 'string' && newValues.toUpperCase() === 'CLEARCACHE') {
+        CacheFinanceUtils.bulkShortCacheRemoveAll(newSymbols, attribute);
+        return 'Short Cache Cleared';
+    }
+
+    if (newSymbols.length === 0 || attribute === '') {
+        return '';
+    }
+
+    Logger.log("CacheFinances START.  Attribute=" + attribute + " symbols=" + symbols.length);
+
+    return CacheFinance.getBulkFinanceData(newSymbols, attribute, newValues, webSiteLookupCacheSeconds);
 }
 
 /**
@@ -74,10 +133,10 @@ class CacheFinance {
      * @param {any} valueFromCache - optional - value previously read from cache.
      * @returns {any}
      */
-    static getFinanceData(symbol, attribute, googleFinanceValue, valueFromCache=null) {
+    static getFinanceData(symbol, attribute, googleFinanceValue, valueFromCache = null) {
         attribute = attribute.toUpperCase().trim();
         symbol = symbol.toUpperCase();
-        const cacheKey = CacheFinance.makeCacheKey(symbol, attribute);
+        const cacheKey = CacheFinanceUtils.makeCacheKey(symbol, attribute);
 
         //  This time GOOGLEFINANCE worked!!!
         if (googleFinanceValue !== GOOGLEFINANCE_PARAM_NOT_USED && googleFinanceValue !== "#N/A" && googleFinanceValue !== '#ERROR!') {
@@ -120,12 +179,151 @@ class CacheFinance {
 
     /**
      * 
-     * @param {String} symbol 
+     * @param {String[]} symbols 
      * @param {String} attribute 
-     * @returns {String}
+     * @param {any[]} googleFinanceValues 
+     * @param {Number} webSiteLookupCacheSeconds
+     * @returns {any[][]}
      */
-    static makeCacheKey(symbol, attribute) {
-        return `${attribute}|${symbol}`;
+    static getBulkFinanceData(symbols, attribute, googleFinanceValues, webSiteLookupCacheSeconds) {
+        const MAX_SHORT_CACHE_SECONDS = 21600;      // For VALID GOOGLEFINANCE values.
+        const MAX_SHORT_CACHE_THIRD_PARTY = 1200;   // This will force a lookup every 20 minutes for stocks NEVER found in GOOGLEFINANCE()
+
+        //  ALL valid google data points are put in SHORT cache.
+        CacheFinanceUtils.bulkShortCachePut(symbols, attribute, googleFinanceValues, MAX_SHORT_CACHE_SECONDS);
+
+        //  All invalid data points with a valid entry in short cache is used.
+        googleFinanceValues = CacheFinance.updateMissingValuesFromShortCache(symbols, attribute, googleFinanceValues);
+
+        //  At this point, it will be mostly items that GOOGLE FINANCE just never works for.
+        let symbolsWithNoData = CacheFinance.getSymbolsWithNoValidData(symbols, googleFinanceValues);
+
+        //  Make requests (very slow) from financial web sites to find missing data.
+        const thirdPartyStockAtributes = ThirdPartyFinance.getMissingStockAttributesFromThirdParty(symbolsWithNoData, attribute);
+        const thirdPartyFinanceValues = CacheFinance.getValuesFromStockAttributes(thirdPartyStockAtributes, attribute);
+        googleFinanceValues = CacheFinance.updateMasterWithMissed(symbols, googleFinanceValues, symbolsWithNoData, thirdPartyFinanceValues);
+
+        //  All data found in websites (not GOOGLEFINANCE) is placed in cache (for a shorter period of time than those from GOOGLEFINANCE)
+        const cacheSeconds = webSiteLookupCacheSeconds === -1 ? MAX_SHORT_CACHE_THIRD_PARTY : webSiteLookupCacheSeconds;
+        CacheFinance.putAllStockAttributeDataIntoShortCache(thirdPartyStockAtributes, symbolsWithNoData, cacheSeconds);
+
+        // Last, last resort.  Try to find in LONG CACHE.  This could be DAYS old, but it is better than invalid data.
+        symbolsWithNoData = CacheFinance.getSymbolsWithNoValidData(symbols, googleFinanceValues);
+        const longCacheValues = CacheFinanceUtils.bulkLongCacheGet(symbolsWithNoData, attribute);
+        googleFinanceValues = CacheFinance.updateMasterWithMissed(symbols, googleFinanceValues, symbolsWithNoData, longCacheValues);
+
+        //  Save everything we have found into the long cache for dire use cases in future.
+        CacheFinanceUtils.bulkLongCachePut(symbols, attribute, googleFinanceValues);
+
+        return CacheFinanceUtils.convertSingleToDoubleArray(googleFinanceValues);
+    }
+
+    /**
+     * 
+     * @param {StockAttributes[]} stockAttributes 
+     * @param {String} attribute 
+     * @returns 
+     */
+    static getValuesFromStockAttributes(stockAttributes, attribute) {
+        return stockAttributes.map(stockData => stockData.getValue(attribute));
+    }
+
+    /**
+     * 
+     * @param {StockAttributes[]} thirdPartyStockAtributes 
+     * @param {String[]} symbolsWithNoData 
+     * @param {Number} cacheSeconds 
+     */
+    static putAllStockAttributeDataIntoShortCache(thirdPartyStockAtributes, symbolsWithNoData, cacheSeconds) {
+        const thirdPartyPriceValues = CacheFinance.getValuesFromStockAttributes(thirdPartyStockAtributes, "PRICE");
+        const thirdPartyNameValues = CacheFinance.getValuesFromStockAttributes(thirdPartyStockAtributes, "NAME");
+        const thirdPartyYieldValues = CacheFinance.getValuesFromStockAttributes(thirdPartyStockAtributes, "YIELDPCT");
+
+        CacheFinanceUtils.bulkShortCachePut(symbolsWithNoData, "PRICE", thirdPartyPriceValues, cacheSeconds);
+        CacheFinanceUtils.bulkShortCachePut(symbolsWithNoData, "NAME", thirdPartyNameValues, cacheSeconds);
+        CacheFinanceUtils.bulkShortCachePut(symbolsWithNoData, "YIELDPCT", thirdPartyYieldValues, cacheSeconds);
+    }
+
+    /**
+     * 
+     * @param {String[]} symbols 
+     * @param {String} attribute 
+     * @param {any[]} googleFinanceValues 
+     * @returns {any[]}
+     */
+    static updateMissingValuesFromShortCache(symbols, attribute, googleFinanceValues) {
+        if (CacheFinance.isAllGoogleDefaultValuesValid(symbols, googleFinanceValues)) {
+            return googleFinanceValues;
+        }
+
+        const updatedFinanceValues = [];
+        const valueFromCache = CacheFinanceUtils.bulkShortCacheGet(symbols, attribute);
+        for (let i = 0; i < symbols.length; i++) {
+            if (CacheFinanceUtils.isValidGoogleValue(googleFinanceValues[i])) {
+                updatedFinanceValues.push(googleFinanceValues[i]);
+            } else {
+                const valueToUseFromCache = valueFromCache[i] !== null ? valueFromCache[i] : "#N/A";
+                updatedFinanceValues.push(valueToUseFromCache);
+            }
+        }
+
+        return updatedFinanceValues;
+    }
+
+    /**
+     * 
+     * @param {String[]} symbols 
+     * @param {any[]} googleFinanceValues 
+     * @returns {Boolean}
+     */
+    static isAllGoogleDefaultValuesValid(symbols, googleFinanceValues) {
+        if (symbols.length !== googleFinanceValues.length) {
+            return false;
+        }
+
+        return  CacheFinance.getSymbolsWithNoValidData(symbols, googleFinanceValues).length === 0;
+    }
+
+    /**
+     * 
+     * @param {String[]} symbols 
+     * @param {any[]} googleFinanceValues 
+     * @returns {String[]}
+     */
+    static getSymbolsWithNoValidData(symbols, googleFinanceValues) {
+        const symbolsWithNoData = [];
+
+        for (let i = 0; i < symbols.length; i++) {
+            if (!CacheFinanceUtils.isValidGoogleValue(googleFinanceValues[i])) {
+                symbolsWithNoData.push(symbols[i]);
+            }
+        }
+
+        return symbolsWithNoData;
+    }
+
+    /**
+     * 
+     * @param {String[]} symbols 
+     * @param {any[]} googleFinanceValues 
+     * @param {String[]} symbolsWithNoData 
+     * @param {any[]} thirdPartyFinanceValues 
+     * @returns 
+     */
+    static updateMasterWithMissed(symbols, googleFinanceValues, symbolsWithNoData, thirdPartyFinanceValues) {
+        let startPos = 0;
+
+        for (let i = 0; i < symbolsWithNoData.length; i++) {
+            const j = symbols.indexOf(symbolsWithNoData[i], startPos);
+            if (j !== -1) {
+                if (CacheFinanceUtils.isValidGoogleValue(thirdPartyFinanceValues[i])) {
+                    googleFinanceValues[j] = thirdPartyFinanceValues[i];
+                }
+                startPos = j;
+            }
+        }
+
+        return googleFinanceValues;
     }
 
     /**
@@ -195,11 +393,11 @@ class CacheFinance {
         if (stockAttributes === null)
             return;
         if (stockAttributes.isAttributeSet("NAME"))
-            CacheFinance.saveFinanceValueToCache(CacheFinance.makeCacheKey(symbol, "NAME"), stockAttributes.stockName, 1200);
+            CacheFinance.saveFinanceValueToCache(CacheFinanceUtils.makeCacheKey(symbol, "NAME"), stockAttributes.stockName, 1200);
         if (stockAttributes.isAttributeSet("PRICE"))
-            CacheFinance.saveFinanceValueToCache(CacheFinance.makeCacheKey(symbol, "PRICE"), stockAttributes.stockPrice, 1200);
+            CacheFinance.saveFinanceValueToCache(CacheFinanceUtils.makeCacheKey(symbol, "PRICE"), stockAttributes.stockPrice, 1200);
         if (stockAttributes.isAttributeSet("YIELDPCT"))
-            CacheFinance.saveFinanceValueToCache(CacheFinance.makeCacheKey(symbol, "YIELDPCT"), stockAttributes.yieldPct, 1200);
+            CacheFinance.saveFinanceValueToCache(CacheFinanceUtils.makeCacheKey(symbol, "YIELDPCT"), stockAttributes.yieldPct, 1200);
     }
 
     /**
@@ -210,24 +408,24 @@ class CacheFinance {
      * @param {any} currentShortCacheValue
      * @returns {void}
      */
-    static saveFinanceValueToCache(key, financialData, shortCacheSeconds = 1200, currentShortCacheValue=null) {
+    static saveFinanceValueToCache(key, financialData, shortCacheSeconds = 1200, currentShortCacheValue = null) {
         const shortCache = CacheService.getScriptCache();
         if (currentShortCacheValue === null) {
             currentShortCacheValue = shortCache.get(key);
         }
         const longCacheDays = 7;
 
-        if (! CacheFinance.isTimeToUpdateCache(currentShortCacheValue, financialData)) {
+        if (!CacheFinance.isTimeToUpdateCache(currentShortCacheValue, financialData)) {
             return;
         }
-   
+
         //  If we normally get the price from Google, we want to cache for a longer
         //  time because the only time we need a price for this particular stock
         //  is when GOOGLEFINANCE fails.
         let start = new Date().getTime();
         shortCache.put(key, JSON.stringify(financialData), shortCacheSeconds);
         const shortMs = new Date().getTime() - start;
-       
+
         //  For emergency cases when GOOGLEFINANCE is down long term...
         start = new Date().getTime();
         const longCache = new ScriptSettings();
@@ -253,7 +451,7 @@ class CacheFinance {
             }
 
             if (oldData > 0 && financialData > 0) {
-                const changeInPrice =  oldData - financialData;
+                const changeInPrice = oldData - financialData;
                 const percentChange = Math.abs(changeInPrice / oldData);
                 if (percentChange < 0.0025) {
                     Logger.log(`Short Cache Changed very little.  Old=${oldData} . New=${financialData}`);
@@ -273,8 +471,8 @@ class CacheFinance {
      * @param {String} attribute 
      */
     static deleteFromCache(symbol, attribute) {
-        const key = CacheFinance.makeCacheKey(symbol, attribute);
-        
+        const key = CacheFinanceUtils.makeCacheKey(symbol, attribute);
+
         CacheFinance.deleteFromShortCache(key);
         CacheFinance.deleteFromLongCache(key);
     }

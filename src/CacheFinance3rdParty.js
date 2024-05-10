@@ -3,6 +3,7 @@
 
 import { ScriptSettings } from "./SQL/ScriptSettings.js";
 import { FinanceWebSites, StockAttributes, FinanceWebSite } from "./CacheFinanceWebSites.js";
+import { CacheFinanceUtils } from "./CacheFinanceUtils.js";
 export { ThirdPartyFinance, FinanceWebsiteSearch };
 
 class Logger {
@@ -25,6 +26,19 @@ class ThirdPartyFinance {                   //  skipcq: JS-0128
     static get(symbol, attribute) {
         const searcher = new FinanceWebsiteSearch();
         const data = searcher.get(symbol, attribute);
+
+        return data;
+    }
+
+    /**
+     * 
+     * @param {String[]} symbols 
+     * @param {String} attribute 
+     * @returns {StockAttributes[]}
+     */
+    static getMissingStockAttributesFromThirdParty(symbols, attribute) {
+        const financeSites = new FinanceWebsiteSearch();
+        const data = financeSites.getAll(symbols, attribute);
 
         return data;
     }
@@ -54,6 +68,155 @@ class FinanceWebsiteSearch {
         }
 
         return dataPlan.data;
+    }
+
+    /**
+     * 
+     * @param {String[]} symbols 
+     * @param {String} attribute 
+     * @returns {StockAttributes[]}
+     */
+    getAll(symbols, attribute) {
+        const MAX_TIME_FOR_FETCH_Ms = 25000;        //  Custom function times out at 30 seconds, so we need to limit.
+        const bestStockSites = FinanceWebsiteSearch.readBestStockWebsites();
+        const siteURLs = FinanceWebsiteSearch.getAllStockWebSiteFunctions(symbols, attribute, bestStockSites);
+        
+        let batch = 1;
+        const startTime = Date.now();
+        let missingStockData = [...siteURLs];
+        while (missingStockData.length > 0 && (Date.now() - startTime) < MAX_TIME_FOR_FETCH_Ms) { 
+            const URLs = FinanceWebsiteSearch.getNextUrlBatch(missingStockData);
+
+            Logger.log("Batch=" + batch + ". URLs" + URLs);
+            const responses = FinanceWebsiteSearch.bulkSiteFetch(URLs);
+            const elapsedTime = Date.now() - startTime;
+            Logger.log("Batch=" + batch + ". Responses=" + responses.length + ". Total Elapsed=" + elapsedTime);
+            batch++;
+
+            FinanceWebsiteSearch.updateStockResults(missingStockData, URLs, responses, attribute, bestStockSites);
+            
+            missingStockData = missingStockData.filter(stock => ! stock.stockAttributes.isAttributeSet(attribute) && ! stock.isSitesDone())
+        }
+
+        //  TODO:  If separate CACHEFINANCES() run at the same time, the last process to finish will overwrite any new results
+        //         from the other runs.  This is not critical, since it is ONLY  used to improve the ordering of sites to call AND
+        //         over time as the processes run on their own, the data will be corrected.
+        FinanceWebsiteSearch.writeBestStockWebsites(bestStockSites);
+        
+        return siteURLs.map(stock => stock.stockAttributes);
+    }
+
+    /**
+     * 
+     * @param {StockWebURL[]} missingStockData 
+     * @returns {String[]}
+     */
+    static getNextUrlBatch(missingStockData) {
+        const MAX_FETCHALL_BATCH_SIZE = 50;
+
+        let URLs = missingStockData.map(url => url.getURL()).filter(url => url !== null && url !== '');
+        if (URLs.length > MAX_FETCHALL_BATCH_SIZE) {
+            URLs = URLs.slice(0, MAX_FETCHALL_BATCH_SIZE);
+        }
+
+        return URLs;
+    }
+
+    /**
+     * 
+     * @param {StockWebURL[]} missingStockData 
+     * @param {String[]} URLs 
+     * @param {String[]} responses 
+     * @param {String} attribute
+     * @param {Object} bestStockSites
+     */
+    static updateStockResults(missingStockData, URLs, responses, attribute, bestStockSites) {
+        for (let i = 0; i < URLs.length; i++) {
+            const matchingSites = missingStockData.filter(site => site.getURL() === URLs[i]);
+            matchingSites.map(site => site.parseResponse(responses[i], attribute));
+            matchingSites.map(site => site.updateBestSites(bestStockSites, attribute));
+            matchingSites.map(site => site.skipToNextSite());
+        }
+    }
+
+    /**
+     * 
+     * @param {String[]} symbols 
+     * @param {String} attribute 
+     * @param {Object} bestStockSites
+     * @returns {StockWebURL[]}
+     */
+    static getAllStockWebSiteFunctions(symbols, attribute, bestStockSites) {
+        const stockURLs = [];
+        const apiMap = new Map();
+        const siteInfo = new FinanceWebSites();
+        const siteList = siteInfo.get();
+
+        //  Getting this is slow, so save and use later.
+        for (const site of siteList) {
+            apiMap.set(site.siteName, site.siteObject.getApiKey())
+        }
+
+        for (const symbol of symbols) {
+            const stockURL = new StockWebURL(symbol);
+            const bestSite = bestStockSites[CacheFinanceUtils.makeCacheKey(symbol, attribute)];
+
+            for (const site of siteList) {
+                stockURL.addSiteURL(site.siteName, site.siteName === bestSite, site.siteObject.getURL(symbol, attribute, apiMap.get(site.siteName)), site.siteObject.parseResponse);
+            }
+
+            stockURLs.push(stockURL);
+        }
+
+        return stockURLs;
+    }
+
+    /**
+     * 
+     * @returns {Object}
+     */
+    static readBestStockWebsites() {
+        const longCache = new ScriptSettings();
+        let siteObject = longCache.get("CACHE_WEBSITES"); 
+        
+        return siteObject === null ? {} : siteObject;
+    }
+
+    /**
+     * 
+     * @param {Object} siteObject 
+     */
+    static writeBestStockWebsites(siteObject) {
+        const longCache = new ScriptSettings();
+        longCache.put("CACHE_WEBSITES", siteObject, 365);    
+    }
+
+
+    /**
+     * 
+     * @param {String[]} URLs 
+     * @returns {String[]}
+     */
+    static bulkSiteFetch(URLs) {
+        const filteredURLs = URLs.filter(url => url.trim() !== '');
+        const fetchURLs = filteredURLs.map(url => {
+            return {
+                'url': url,
+                'method': 'get',
+                'muteHttpExceptions': true
+            }
+        });
+
+        let dataSet = [];
+        try {
+            const rawSiteData = UrlFetchApp.fetchAll(fetchURLs);
+            dataSet = rawSiteData.map(response => response.getContentText());
+        }
+        catch (ex) {
+            return dataSet;
+        };
+
+        return dataSet;
     }
 
     /**
@@ -90,7 +253,7 @@ class FinanceWebsiteSearch {
 
             // Create small object with needed data for conversion to JSON.
             const searchPlan = planWithData.lookupPlan.createFinanceSiteList();
-            
+
             longCache.put(cacheKey, searchPlan, LOOKUP_PLAN_ACTIVE_DAYS);
             return planWithData;
         }
@@ -137,8 +300,96 @@ class FinanceWebsiteSearch {
         const longCache = new ScriptSettings();
 
         const cacheKey = FinanceWebsiteSearch.makeCacheKey(symbol);
-         
+
         longCache.delete(cacheKey);
+    }
+}
+
+class StockWebURL {
+    constructor (symbol) {
+        this.symbol = symbol;
+        this.siteName = [];
+        this.siteURL = [];
+        this.bestSites = [];
+        this.parseFunction = [];
+        /** @type {StockAttributes} */
+        this.stockAttributes = new StockAttributes();
+        this.siteIterator = 0;
+    }
+
+    /**
+     * 
+     * @param {String} siteName 
+     * @param {String} URL 
+     * @param {Object} parseResponseFunction 
+     * @returns 
+     */
+    addSiteURL(siteName, bestSite, URL, parseResponseFunction) {
+        if (URL.trim() === '') {
+            return;
+        } 
+
+        if (bestSite) {
+            this.siteName.unshift(siteName);
+            this.siteURL.unshift(URL);
+            this.parseFunction.unshift(parseResponseFunction);
+            this.bestSites.unshift(true);
+        }
+        else {
+            this.siteName.push(siteName);
+            this.siteURL.push(URL);
+            this.parseFunction.push(parseResponseFunction);
+            this.bestSites.push(false);
+        }
+    }
+
+    /**
+     * Returns next website URL to be used.
+     * @returns {String}
+     */
+    getURL() {
+        return  this.siteIterator < this.siteURL.length ? this.siteURL[this.siteIterator] : null;  
+    }
+
+    /**
+     * 
+     * @param {String} html 
+     * @param {String} attribute ["PRICE, "NAME, "YIELDPCT"]
+     * @returns {StockAttributes}
+     */
+    parseResponse(html, attribute) {
+        this.stockAttributes = this.siteIterator < this.siteURL.length ? this.parseFunction[this.siteIterator](html, this.symbol, attribute) : null;
+
+        //  Keep track of a website that worked, so we use right away next time.
+        this.bestSites[this.siteIterator] = (this.stockAttributes === null || ! this.stockAttributes.isAttributeSet(attribute)) ? false : true;
+
+        return this.stockAttributes;
+    }
+
+    /**
+     * 
+     * @param {Object} bestStockSites 
+     * @param {String} attribute 
+     */
+    updateBestSites(bestStockSites, attribute) {
+        const key = CacheFinanceUtils.makeCacheKey(this.symbol, attribute);
+        bestStockSites[key] = (this.stockAttributes === null || ! this.stockAttributes.isAttributeSet(attribute)) ? "" : this.siteName[this.siteIterator];
+    }
+
+    /**
+     * Updates internal pointer for next site to be used.
+     * @returns {void}
+     */
+    skipToNextSite() {
+        this.siteIterator++;
+    }
+
+    /**
+     * 
+     * @returns {Boolean}
+     */
+    isSitesDone() {
+        return this.siteIterator >= this.siteName.length;
     }
 }
 
@@ -159,8 +410,8 @@ class FinanceSiteList {
         this.nameSites = [];
         /** @property {String[]} */
         this.yieldSites = [];
-    } 
-    
+    }
+
     /**
      * 
      * @param {String[]} arr 
@@ -236,9 +487,9 @@ class FinanceSiteLookupAnalyzer {
         this.nameSites = siteStats.filter(a => a.name !== null);
         this.yieldSites = siteStats.filter(a => a.yield !== null);
 
-        this.priceSites.sort((a,b) => a.timeMs - b.timeMs);
-        this.nameSites.sort((a,b) => a.timeMs - b.timeMs);
-        this.yieldSites.sort((a,b) => a.timeMs - b.timeMs);
+        this.priceSites.sort((a, b) => a.timeMs - b.timeMs);
+        this.nameSites.sort((a, b) => a.timeMs - b.timeMs);
+        this.yieldSites.sort((a, b) => a.timeMs - b.timeMs);
     }
 
 
@@ -282,7 +533,7 @@ class FinanceSiteLookupAnalyzer {
                 siteArr = stockSites.priceSites;
                 break;
         }
-        
+
         return FinanceSiteLookupAnalyzer.getAttributeDataFromSite(stockSites.symbol, siteArr, attribute);
     }
 
@@ -305,18 +556,18 @@ class FinanceSiteLookupAnalyzer {
             }
 
             try {
-              data = siteFunction.siteObject.getInfo(symbol, attribute);
+                data = siteFunction.siteObject.getInfo(symbol, attribute);
             }
-            catch(ex) {
-              Logger.log(`No SITE Object.  Symbol=${symbol}. Attrib=${attribute}. Site=${site}`);
-            }            
+            catch (ex) {
+                Logger.log(`No SITE Object.  Symbol=${symbol}. Attrib=${attribute}. Site=${site}`);
+            }
 
             if (data?.isAttributeSet(attribute)) {
                 return data;
             }
-        }  
-        
-        return data;        
+        }
+
+        return data;
     }
 }
 

@@ -25,12 +25,12 @@ class FinanceWebSites {
      */
     constructor() {
         this.siteList = [
-            new FinanceWebSite("FinnHub", FinnHub),
-            new FinanceWebSite("AlphaVantage", AlphaVantage),
+            new FinanceWebSite("FinnHub", FinnHub),           
             new FinanceWebSite("TDEtf", TdMarketsEtf),
             new FinanceWebSite("TDStock", TdMarketsStock),
+            new FinanceWebSite("Globe", GlobeAndMail),
             new FinanceWebSite("Yahoo", YahooFinance),
-            new FinanceWebSite("Globe", GlobeAndMail)
+            new FinanceWebSite("AlphaVantage", AlphaVantage)
         ];
 
         /** @property {Map<String, FinanceWebSite>} */
@@ -138,7 +138,7 @@ class FinanceWebSite {
      */
     constructor(siteName, webSiteJsClass) {
         this.siteName = siteName.toUpperCase();
-        this.siteObject = webSiteJsClass;
+        this._siteObject = webSiteJsClass;
     }
 
     set siteName(siteName) {
@@ -148,10 +148,10 @@ class FinanceWebSite {
         return this._siteName;
     }
 
-    set webSiteClass(siteObject) {
+    set siteObject(siteObject) {
         this._siteObject = siteObject;
     }
-    get webSiteClass() {
+    get siteObject() {
         return this._siteObject;
     }
 }
@@ -199,13 +199,13 @@ class StockAttributes {
     getValue(attribute) {
         switch (attribute) {
             case "PRICE":
-                return (this.stockPrice === null) ? 0 : this.stockPrice;
+                return (this.stockPrice === null) ? '' : this.stockPrice;
 
             case "YIELDPCT":
-                return (this.yieldPct === null) ? 0 : this.yieldPct;
+                return (this.yieldPct === null) ? '' : this.yieldPct;
 
             case "NAME":
-                return (this.stockName === null) ? "" : this.stockName;
+                return (this.stockName === null) ? '' : this.stockName;
 
             default:
                 return '#N/A';
@@ -220,7 +220,7 @@ class StockAttributes {
     isAttributeSet(attribute) {
         switch (attribute) {
             case "PRICE":
-                return this.stockPrice !== null;
+                return this.stockPrice !== null && this.stockPrice !== 0;
 
             case "YIELDPCT":
                 return this.yieldPct !== null;
@@ -250,6 +250,29 @@ class TdMarketsEtf {
 
     /**
      * 
+     * @param {String} symbol 
+     * @returns {String}
+     */
+    static getURL(symbol, attribute) {
+        return TdMarketResearch.getURL(symbol, "ETF");
+    }
+
+    static getApiKey() {
+        return "";    
+    }
+
+    /**
+      * 
+      * @param {String} html 
+      * @param {String} symbol
+      * @returns {StockAttributes}
+      */
+    static parseResponse(html, symbol) {
+        return TdMarketResearch.parseResponse(html);
+    }
+
+    /**
+     * 
      * @param {String} key 
      * @param {any} defaultValue 
      * @returns {any}
@@ -275,6 +298,29 @@ class TdMarketsStock {
 
     /**
      * 
+     * @param {String} symbol 
+     * @returns {String}
+     */
+    static getURL(symbol, attribute) {
+        return TdMarketResearch.getURL(symbol, "STOCK");
+    }
+
+    static getApiKey() {
+        return "";    
+    }
+
+    /**
+      * 
+      * @param {String} html 
+      * @param {String} symbol
+      * @returns {StockAttributes}
+      */
+    static parseResponse(html, symbol) {
+        return TdMarketResearch.parseResponse(html);
+    }
+
+    /**
+     * 
      * @param {String} key 
      * @param {any} defaultValue 
      * @returns {any}
@@ -296,23 +342,43 @@ class TdMarketResearch {
      * @returns {StockAttributes}
      */
     static getInfo(symbol, attribute, type = "ETF") {
-        const data = new StockAttributes();
-
-        let URL = null;
-        if (type === "ETF")
-            URL = `https://marketsandresearch.td.com/tdwca/Public/ETFsProfile/Summary/${FinanceWebSites.getTickerCountryCode(symbol)}/${TdMarketResearch.getTicker(symbol)}`;
-        else
-            URL = `https://marketsandresearch.td.com/tdwca/Public/Stocks/Overview/${FinanceWebSites.getTickerCountryCode(symbol)}/${TdMarketResearch.getTicker(symbol)}`;
+        const URL = TdMarketResearch.getURL(symbol, type);
 
         let html = null;
         try {
             html = UrlFetchApp.fetch(URL).getContentText();
         }
         catch (ex) {
-            return data;
+            return new StockAttributes();
         }
-        Logger.log(`getInfo:  ${symbol}`);
-        Logger.log(`URL = ${URL}`);
+        Logger.log(`getInfo:  ${symbol}.  URL = ${URL}`);
+
+        return TdMarketResearch.parseResponse(html);
+    }
+
+    /**
+     * 
+     * @param {String} symbol 
+     * @param {String} type 
+     * @returns {String}
+     */
+    static getURL(symbol, type = "ETF") {
+        let URL = null;
+        if (type === "ETF")
+            URL = `https://marketsandresearch.td.com/tdwca/Public/ETFsProfile/Summary/${FinanceWebSites.getTickerCountryCode(symbol)}/${TdMarketResearch.getTicker(symbol)}`;
+        else
+            URL = `https://marketsandresearch.td.com/tdwca/Public/Stocks/Overview/${FinanceWebSites.getTickerCountryCode(symbol)}/${TdMarketResearch.getTicker(symbol)}`;
+
+        return URL;
+    }
+
+    /**
+     * 
+     * @param {String} html 
+     * @returns {StockAttributes}
+     */
+    static parseResponse(html) {
+        const data = new StockAttributes();
 
         //  Get the dividend yield.
 
@@ -381,20 +447,52 @@ class YahooFinance {
      * @returns {StockAttributes}
      */
     static getInfo(symbol) {
-        const data = new StockAttributes();
-
-        const URL = `https://finance.yahoo.com/quote/${YahooFinance.getTicker(symbol)}`;
+        const URL = YahooFinance.getURL(symbol);
 
         let html = null;
         try {
             html = UrlFetchApp.fetch(URL).getContentText();
         }
         catch (ex) {
-            return data;
+            return new StockAttributes();
         }
 
-        Logger.log(`getInfo:  ${symbol}`);
-        Logger.log(`URL = ${URL}`);
+        Logger.log(`getInfo:  ${symbol}.  URL = ${URL}`);
+
+        return YahooFinance.parseResponse(html, symbol);
+    }
+
+    /**
+     * 
+     * @param {String} symbol 
+     * @param {String} [attribute]
+     * @returns {String}
+     */
+    static getURL(symbol, attribute) {
+        const countryCode = FinanceWebSites.getTickerCountryCode(symbol);
+        if (countryCode !== "us") {
+            return "";
+        }
+
+        return `https://finance.yahoo.com/quote/${YahooFinance.getTicker(symbol)}`;
+    }
+
+    static getApiKey() {
+        return "";    
+    }
+
+    /**
+     * 
+     * @param {String} html 
+     * @param {String} symbol
+     * @returns {StockAttributes}
+     */
+    static parseResponse(html, symbol) {
+        const data = new StockAttributes();
+
+        if (symbol === '') {
+            return data;
+        }
 
         let dividendPercent = html.match(/"DIVIDEND_AND_YIELD-value">\d*\.\d*\s\((\d*\.\d*)%\)/);
         if (dividendPercent === null) {
@@ -403,7 +501,7 @@ class YahooFinance {
 
         if (dividendPercent !== null && dividendPercent.length === 2) {
             const tempPct = dividendPercent[1];
-            Logger.log(`PERCENT=${tempPct}`);
+            Logger.log(`Yahoo. Stock=${symbol}. PERCENT=${tempPct}`);
 
             data.yieldPct = parseFloat(tempPct) / 100;
 
@@ -419,7 +517,7 @@ class YahooFinance {
 
         if (priceMatch !== null && priceMatch.length === 2) {
             const tempPrice = priceMatch[1];
-            Logger.log(`PRICE=${tempPrice}`);
+            Logger.log(`Yahoo. Stock=${symbol}.PRICE=${tempPrice}`);
 
             data.stockPrice = parseFloat(tempPrice);
 
@@ -472,19 +570,42 @@ class GlobeAndMail {
      * @returns {StockAttributes}
      */
     static getInfo(symbol) {
-        const data = new StockAttributes();
-        const URL = `https://www.theglobeandmail.com/investing/markets/stocks/${GlobeAndMail.getTicker(symbol)}`;
+        const URL = GlobeAndMail.getURL(symbol);
 
-        Logger.log(`getInfo:  ${symbol}`);
-        Logger.log(`URL = ${URL}`);
+        Logger.log(`getInfo:  ${symbol}.  URL = ${URL}`);
 
         let html = null;
         try {
             html = UrlFetchApp.fetch(URL).getContentText();
         }
         catch (ex) {
-            return data;
+            return new StockAttributes();
         }
+
+        return GlobeAndMail.parseResponse(html);
+    }
+
+    /**
+     * 
+     * @param {String} symbol 
+     * @param {String} [attribute]
+     * @returns {String}
+     */
+    static getURL(symbol, attribute) {
+        return `https://www.theglobeandmail.com/investing/markets/stocks/${GlobeAndMail.getTicker(symbol)}`;
+    }
+
+    static getApiKey() {
+        return "";    
+    }
+
+    /**
+     * 
+     * @param {String} html 
+     * @returns {StockAttributes}
+     */
+    static parseResponse(html) {
+        const data = new StockAttributes();
 
         //  Get the dividend yield.
         let parts = html.match(/.name="dividendYieldTrailing".*?value="(\d{0,4}\.?\d{0,4})%/);
@@ -576,7 +697,6 @@ class GlobeAndMail {
  * Set key name as FINNHUB_API_KEY
  */
 class FinnHub {
-
     /**
      * 
      * @param {String} symbol 
@@ -584,13 +704,7 @@ class FinnHub {
      * @returns 
      */
     static getInfo(symbol, attribute = "PRICE") {
-        const data = new StockAttributes();
-        const API_KEY = FinanceWebSites.getApiKey("FINNHUB_API_KEY");
-
-        if (API_KEY === null) {
-            Logger.log("No FinnHub API Key.");
-            return data;
-        }
+        let data = new StockAttributes();
 
         if (attribute !== "PRICE") {
             Logger.log(`Finnhub.  Only PRICE is supported: ${symbol}, ${attribute}`);
@@ -603,21 +717,63 @@ class FinnHub {
             return data;
         }
 
-        const URL = `https://finnhub.io/api/v1/quote?symbol=${FinanceWebSites.getBaseTicker(symbol)}&token=${API_KEY}`;
+        const URL = FinnHub.getURL(symbol, attribute, FinnHub.getApiKey());
         Logger.log(`getInfo:  ${symbol}`);
         Logger.log(`URL = ${URL}`);
 
         let jsonStr = null;
         try {
             jsonStr = UrlFetchApp.fetch(URL).getContentText();
-
-            const hubData = JSON.parse(jsonStr);
-            data.stockPrice = hubData.c;
-            Logger.log(hubData);
+            data = FinnHub.parseResponse(jsonStr);
         }
         catch (ex) {
             return data;
         }
+
+        return data;
+    }
+
+    /**
+     * 
+     * @param {String} symbol 
+     * @param {String} attribute
+     * @param {String} API_KEY
+     * @returns {String}
+     */
+    static getURL(symbol, attribute, API_KEY=null) {
+        if (attribute !== "PRICE") {
+            return "";
+        }
+
+        const countryCode = FinanceWebSites.getTickerCountryCode(symbol);
+        if (countryCode !== "us") {
+            return "";
+        }
+
+        if (API_KEY === null) {
+            return "";
+        }
+
+        return `https://finnhub.io/api/v1/quote?symbol=${FinanceWebSites.getBaseTicker(symbol)}&token=${API_KEY}`;
+    }
+
+    static getApiKey() {
+        return FinanceWebSites.getApiKey("FINNHUB_API_KEY");    
+    }
+
+    /**
+     * 
+     * @param {String} jsonStr 
+     * @param {String} symbol
+     * @param {String} attribute
+     * @returns {StockAttributes}
+     */
+    static parseResponse(jsonStr, symbol, attribute) {
+        const data = new StockAttributes();
+
+        const hubData = JSON.parse(jsonStr);
+        if (attribute === "PRICE")
+            data.stockPrice = hubData.c;
 
         return data;
     }
@@ -634,21 +790,14 @@ class FinnHub {
 }
 
 class AlphaVantage {
-
     /**
      * 
      * @param {String} symbol 
      * @param {String} attribute 
-     * @returns 
+     * @returns {StockAttributes}
      */
     static getInfo(symbol, attribute = "PRICE") {
-        const data = new StockAttributes();
-        const API_KEY = FinanceWebSites.getApiKey("ALPHA_VANTAGE_API_KEY");
-
-        if (API_KEY === null) {
-            Logger.log("No AlphaVantage API Key.");
-            return data;
-        }
+        let data = new StockAttributes();
 
         if (attribute !== "PRICE") {
             Logger.log(`AlphaVantage.  Only PRICE is supported: ${symbol}, ${attribute}`);
@@ -661,21 +810,65 @@ class AlphaVantage {
             return data;
         }
 
-        const URL = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${FinanceWebSites.getBaseTicker(symbol)}&apikey=${API_KEY}`;
-        Logger.log(`getInfo:  ${symbol}`);
-        Logger.log(`URL = ${URL}`);
+        const URL = AlphaVantage.getURL(symbol, attribute, AlphaVantage.getApiKey());
+        Logger.log(`getInfo:  ${symbol}.  URL = ${URL}`);
 
         let jsonStr = null;
         try {
             jsonStr = UrlFetchApp.fetch(URL).getContentText();
-
-            const alphaVantageData = JSON.parse(jsonStr);
-            data.stockPrice = alphaVantageData["Global Quote"]["05. price"];
-            Logger.log(`content=${jsonStr}`);
-            Logger.log(`Price=${data.stockPrice}`);
+            data = AlphaVantage.parseResponse(jsonStr);
         }
         catch (ex) {
             return data;
+        }
+
+        return data;
+    }
+
+    /**
+     * 
+     * @param {String} symbol 
+     * @param {String} attribute
+     * @param {String} API_KEY
+     * @returns {String}
+     */
+    static getURL(symbol, attribute, API_KEY=null) {
+        if (API_KEY === null) {
+            return "";
+        }
+
+        if (attribute !== "PRICE") {
+            return "";
+        }
+
+        const countryCode = FinanceWebSites.getTickerCountryCode(symbol);
+        if (countryCode !== "us") {
+            return "";
+        }
+
+        return `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${FinanceWebSites.getBaseTicker(symbol)}&apikey=${API_KEY}`;
+    }
+
+    static getApiKey() {
+        return FinanceWebSites.getApiKey("ALPHA_VANTAGE_API_KEY");    
+    }
+
+    /**
+     * 
+     * @param {String} jsonStr 
+     * @returns {StockAttributes}
+     */
+    static parseResponse(jsonStr) {
+        const data = new StockAttributes();
+
+        Logger.log(`content=${jsonStr}`);
+        try {
+            const alphaVantageData = JSON.parse(jsonStr);
+            data.stockPrice = alphaVantageData["Global Quote"]["05. price"];
+            Logger.log(`Price=${data.stockPrice}`);
+        }
+        catch (ex) {
+            Logger.log("AlphaVantage JSON Parse Error.");
         }
 
         return data;
