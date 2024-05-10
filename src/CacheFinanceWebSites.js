@@ -258,6 +258,10 @@ class TdMarketsEtf {
         return TdMarketResearch.getURL(symbol, "ETF");
     }
 
+    /**
+     * 
+     * @returns {String}
+     */
     static getApiKey() {
         return "";    
     }
@@ -265,10 +269,10 @@ class TdMarketsEtf {
     /**
       * 
       * @param {String} html 
-      * @param {String} symbol
+      * @param {String} _symbol
       * @returns {StockAttributes}
       */
-    static parseResponse(html, symbol) {
+    static parseResponse(html, _symbol) {
         return TdMarketResearch.parseResponse(html);
     }
 
@@ -307,6 +311,10 @@ class TdMarketsStock {
         return TdMarketResearch.getURL(symbol, "STOCK");
     }
 
+    /**
+     * 
+     * @returns {String}
+     */
     static getApiKey() {
         return "";    
     }
@@ -314,10 +322,10 @@ class TdMarketsStock {
     /**
       * 
       * @param {String} html 
-      * @param {String} symbol
+      * @param {String} _symbol
       * @returns {StockAttributes}
       */
-    static parseResponse(html, symbol) {
+    static parseResponse(html, _symbol) {
         return TdMarketResearch.parseResponse(html);
     }
 
@@ -479,6 +487,10 @@ class YahooFinance {
         return `https://finance.yahoo.com/quote/${YahooFinance.getTicker(symbol)}`;
     }
 
+    /**
+     * 
+     * @returns {Sting}
+     */
     static getApiKey() {
         return "";    
     }
@@ -597,6 +609,10 @@ class GlobeAndMail {
         return `https://www.theglobeandmail.com/investing/markets/stocks/${GlobeAndMail.getTicker(symbol)}`;
     }
 
+    /**
+     * 
+     * @returns {String}
+     */
     static getApiKey() {
         return "";    
     }
@@ -759,6 +775,10 @@ class FinnHub {
         return `https://finnhub.io/api/v1/quote?symbol=${FinanceWebSites.getBaseTicker(symbol)}&token=${API_KEY}`;
     }
 
+    /**
+     * 
+     * @returns {String}
+     */
     static getApiKey() {
         return FinanceWebSites.getApiKey("FINNHUB_API_KEY");    
     }
@@ -851,6 +871,10 @@ class AlphaVantage {
         return `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${FinanceWebSites.getBaseTicker(symbol)}&apikey=${API_KEY}`;
     }
 
+    /**
+     * 
+     * @returns {String}
+     */
     static getApiKey() {
         return FinanceWebSites.getApiKey("ALPHA_VANTAGE_API_KEY");    
     }

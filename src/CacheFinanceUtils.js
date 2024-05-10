@@ -11,6 +11,9 @@ class Logger {
 }
 //  *** DEBUG END ***/
 
+/**
+ * @classdesc Multi-purpose functions used within the cache finance custom functions.
+ */
 class CacheFinanceUtils {
     /**
      * 

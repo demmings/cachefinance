@@ -817,9 +817,9 @@ class FinanceWebsiteSearch {
     static updateStockResults(missingStockData, URLs, responses, attribute, bestStockSites) {
         for (let i = 0; i < URLs.length; i++) {
             const matchingSites = missingStockData.filter(site => site.getURL() === URLs[i]);
-            matchingSites.map(site => site.parseResponse(responses[i], attribute));
-            matchingSites.map(site => site.updateBestSites(bestStockSites, attribute));
-            matchingSites.map(site => site.skipToNextSite());
+            matchingSites.forEach(site => site.parseResponse(responses[i], attribute));
+            matchingSites.forEach(site => site.updateBestSites(bestStockSites, attribute));
+            matchingSites.forEach(site => site.skipToNextSite());
         }
     }
 
@@ -883,10 +883,9 @@ class FinanceWebsiteSearch {
      */
     static bulkSiteFetch(URLs) {
         const filteredURLs = URLs.filter(url => url.trim() !== '');
-        const fetchURLs = filteredURLs.map(url => {
-            //  skipcq:  JS-0240
+        const fetchURLs = filteredURLs.map(url => {    
             return {
-                'url': url,
+                'url': url,         // skipcq: JS-0240 
                 'method': 'get',
                 'muteHttpExceptions': true
             }
@@ -990,6 +989,9 @@ class FinanceWebsiteSearch {
     }
 }
 
+/**
+ * @classdesc Tracks and generates URLs to find stock data.  Also tracks parsing functions for extracting data from HTML.
+ */
 class StockWebURL {
     constructor (symbol) {
         this.symbol = symbol;
@@ -1046,7 +1048,7 @@ class StockWebURL {
         this.stockAttributes = this.siteIterator < this.siteURL.length ? this.parseFunction[this.siteIterator](html, this.symbol, attribute) : null;
 
         //  Keep track of a website that worked, so we use right away next time.
-        this.bestSites[this.siteIterator] = (this.stockAttributes === null || ! this.stockAttributes.isAttributeSet(attribute)) ? false : true;
+        this.bestSites[this.siteIterator] = (this?.stockAttributes.isAttributeSet(attribute)) ? false : true;
 
         return this.stockAttributes;
     }
@@ -1804,6 +1806,10 @@ class TdMarketsEtf {
         return TdMarketResearch.getURL(symbol, "ETF");
     }
 
+    /**
+     * 
+     * @returns {String}
+     */
     static getApiKey() {
         return "";    
     }
@@ -1811,10 +1817,10 @@ class TdMarketsEtf {
     /**
       * 
       * @param {String} html 
-      * @param {String} symbol
+      * @param {String} _symbol
       * @returns {StockAttributes}
       */
-    static parseResponse(html, symbol) {
+    static parseResponse(html, _symbol) {
         return TdMarketResearch.parseResponse(html);
     }
 
@@ -1853,6 +1859,10 @@ class TdMarketsStock {
         return TdMarketResearch.getURL(symbol, "STOCK");
     }
 
+    /**
+     * 
+     * @returns {String}
+     */
     static getApiKey() {
         return "";    
     }
@@ -1860,10 +1870,10 @@ class TdMarketsStock {
     /**
       * 
       * @param {String} html 
-      * @param {String} symbol
+      * @param {String} _symbol
       * @returns {StockAttributes}
       */
-    static parseResponse(html, symbol) {
+    static parseResponse(html, _symbol) {
         return TdMarketResearch.parseResponse(html);
     }
 
@@ -2025,6 +2035,10 @@ class YahooFinance {
         return `https://finance.yahoo.com/quote/${YahooFinance.getTicker(symbol)}`;
     }
 
+    /**
+     * 
+     * @returns {Sting}
+     */
     static getApiKey() {
         return "";    
     }
@@ -2143,6 +2157,10 @@ class GlobeAndMail {
         return `https://www.theglobeandmail.com/investing/markets/stocks/${GlobeAndMail.getTicker(symbol)}`;
     }
 
+    /**
+     * 
+     * @returns {String}
+     */
     static getApiKey() {
         return "";    
     }
@@ -2305,6 +2323,10 @@ class FinnHub {
         return `https://finnhub.io/api/v1/quote?symbol=${FinanceWebSites.getBaseTicker(symbol)}&token=${API_KEY}`;
     }
 
+    /**
+     * 
+     * @returns {String}
+     */
     static getApiKey() {
         return FinanceWebSites.getApiKey("FINNHUB_API_KEY");    
     }
@@ -2397,6 +2419,10 @@ class AlphaVantage {
         return `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${FinanceWebSites.getBaseTicker(symbol)}&apikey=${API_KEY}`;
     }
 
+    /**
+     * 
+     * @returns {String}
+     */
     static getApiKey() {
         return FinanceWebSites.getApiKey("ALPHA_VANTAGE_API_KEY");    
     }
@@ -2433,6 +2459,9 @@ class AlphaVantage {
     }
 }
 
+/**
+ * @classdesc Multi-purpose functions used within the cache finance custom functions.
+ */
 class CacheFinanceUtils {
     /**
      * 

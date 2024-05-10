@@ -132,9 +132,9 @@ class FinanceWebsiteSearch {
     static updateStockResults(missingStockData, URLs, responses, attribute, bestStockSites) {
         for (let i = 0; i < URLs.length; i++) {
             const matchingSites = missingStockData.filter(site => site.getURL() === URLs[i]);
-            matchingSites.map(site => site.parseResponse(responses[i], attribute));
-            matchingSites.map(site => site.updateBestSites(bestStockSites, attribute));
-            matchingSites.map(site => site.skipToNextSite());
+            matchingSites.forEach(site => site.parseResponse(responses[i], attribute));
+            matchingSites.forEach(site => site.updateBestSites(bestStockSites, attribute));
+            matchingSites.forEach(site => site.skipToNextSite());
         }
     }
 
@@ -198,10 +198,9 @@ class FinanceWebsiteSearch {
      */
     static bulkSiteFetch(URLs) {
         const filteredURLs = URLs.filter(url => url.trim() !== '');
-        const fetchURLs = filteredURLs.map(url => {
-            //  skipcq:  JS-0240
+        const fetchURLs = filteredURLs.map(url => {    
             return {
-                'url': url,
+                'url': url,         // skipcq: JS-0240 
                 'method': 'get',
                 'muteHttpExceptions': true
             }
@@ -305,6 +304,9 @@ class FinanceWebsiteSearch {
     }
 }
 
+/**
+ * @classdesc Tracks and generates URLs to find stock data.  Also tracks parsing functions for extracting data from HTML.
+ */
 class StockWebURL {
     constructor (symbol) {
         this.symbol = symbol;
@@ -361,7 +363,7 @@ class StockWebURL {
         this.stockAttributes = this.siteIterator < this.siteURL.length ? this.parseFunction[this.siteIterator](html, this.symbol, attribute) : null;
 
         //  Keep track of a website that worked, so we use right away next time.
-        this.bestSites[this.siteIterator] = (this.stockAttributes === null || ! this.stockAttributes.isAttributeSet(attribute)) ? false : true;
+        this.bestSites[this.siteIterator] = (this?.stockAttributes.isAttributeSet(attribute)) ? false : true;
 
         return this.stockAttributes;
     }
