@@ -782,8 +782,8 @@ class FinanceWebsiteSearch {
             missingStockData = missingStockData.filter(stock => ! stock.stockAttributes.isAttributeSet(attribute) && ! stock.isSitesDone())
         }
 
-        //  TODO:  If separate CACHEFINANCES() run at the same time, the last process to finish will overwrite any new results
-        //         from the other runs.  This is not critical, since it is ONLY  used to improve the ordering of sites to call AND
+        //  Note:  If separate CACHEFINANCES() run at the same time, the last process to finish will overwrite any new results
+        //         from the other runs.  This is not critical, since it is ONLY used to improve the ordering of sites to call AND
         //         over time as the processes run on their own, the data will be corrected.
         FinanceWebsiteSearch.writeBestStockWebsites(bestStockSites);
         
@@ -1048,7 +1048,7 @@ class StockWebURL {
         this.stockAttributes = this.siteIterator < this.siteURL.length ? this.parseFunction[this.siteIterator](html, this.symbol, attribute) : null;
 
         //  Keep track of a website that worked, so we use right away next time.
-        this.bestSites[this.siteIterator] = (this?.stockAttributes.isAttributeSet(attribute)) ? false : true;
+        this.bestSites[this.siteIterator] = this?.stockAttributes.isAttributeSet(attribute);
 
         return this.stockAttributes;
     }
