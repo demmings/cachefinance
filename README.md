@@ -117,8 +117,12 @@
     *  **defaultValueRange** - A sheets range of cells that contain a default value (use GOOGLEFINANCE() to provide this).
        *  For attributes that have no default value (i.e. yieldpct), just leave empty.
     *  **cacheSeconds** - Cache Seconds.  optional (0 --> 21600).  Used primarily for symbols/attributes that NEVER provide a default value.  
-       *  So for prices data attribute, this should be set fairly low (something like 1200 seconds).  This will cause actual website lookups to find the data every **X** seconds.  This operation is slow and expensive (resouce wise), but it is important to have fairly recent values if you monitor your stock values during the day.
+       *  So for prices data attribute, this should be set fairly low (something like 1200 seconds).  This will cause actual website lookups to find the data every **X** seconds.  This operation is slow and expensive (resource wise), but it is important to have fairly recent values if you monitor your stock values during the day.
        *  For attributes like **NAME**, which almost never changes, you should set the cache value to a higher number like 21600.  There is no need to waste resources looking up websites to find data that rarely changes - and even if it does, the portfolio values would not be affected.
+*  **LIMITATIONS**
+   *  A custom function has an execution time limit of 30 seconds, so trying to do a massive number of web URL data lookups may cause the function to timeout (when Sheets is not behaving properly).  The function itself will exit as it approaches 30 seconds, so any stock not processed yet will return a blank value.  If the function is run again immediately (by changing any value of a parameter - eg. 'yieldpct' to 'YIELDPCT'), it will continue from where it left off.
+   *  For any attribute that gets most of the default values from GOOGLEFINANCE, this should not be an issue.  For an attribute like **YIELDPCT**, where all stocks must be looked up at third party websites, it can be more of an issue.
+   *  For my own personal sheets looking up 150 'YIELDPCT' stocks can be processed without issue.
 * **EXAMPLES**
 ```
 =CACHEFINANCES(A30:A164, "price", B30:B164, 1200)
