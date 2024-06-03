@@ -148,19 +148,19 @@ class CacheFinance {
         }
 
         //  GOOGLEFINANCE has failed OR was not used.  Is it in the cache?
-        const data = CacheFinance.getFinanceValueFromShortCache(cacheKey);
-        if (data !== null) {
-            return data;
+        const shortCacheData = CacheFinance.getFinanceValueFromShortCache(cacheKey);
+        if (shortCacheData !== null) {
+            return shortCacheData;
         }
 
         //  Last resort... try other sites.
-        let stockAttributes = ThirdPartyFinance.get(symbol, attribute);
+        const stockAttributes = ThirdPartyFinance.get(symbol, attribute);
 
         //  Failed third party lookup, try using long term cache.
         if (!stockAttributes.isAttributeSet(attribute)) {
-            const data = CacheFinance.getFinanceValueFromLongCache(cacheKey);
-            if (data !== null) {
-                return data;
+            const longCacheData = CacheFinance.getFinanceValueFromLongCache(cacheKey);
+            if (longCacheData !== null) {
+                return longCacheData;
             }
         }
         else {
