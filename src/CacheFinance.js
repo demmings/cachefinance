@@ -147,13 +147,8 @@ class CacheFinance {
             return googleFinanceValue;
         }
 
-        //  In the case where GOOGLE never gives a value (or GoogleFinance is never used),
-        //  we don't want to pull from long cache (at this point).
-        const useShortCacheOnly = googleFinanceValue === GOOGLEFINANCE_PARAM_NOT_USED || googleFinanceValue !== "#N/A";
-
         //  GOOGLEFINANCE has failed OR was not used.  Is it in the cache?
-        const data = CacheFinance.getFinanceValueFromCache(cacheKey, useShortCacheOnly);
-
+        const data = CacheFinance.getFinanceValueFromShortCache(cacheKey);
         if (data !== null) {
             return data;
         }
@@ -163,9 +158,9 @@ class CacheFinance {
 
         //  Failed third party lookup, try using long term cache.
         if (!stockAttributes.isAttributeSet(attribute)) {
-            const cachedStockAttribute = CacheFinance.getFinanceValueFromCache(cacheKey, false);
-            if (cachedStockAttribute !== null) {
-                stockAttributes = cachedStockAttribute;
+            const data = CacheFinance.getFinanceValueFromLongCache(cacheKey);
+            if (data !== null) {
+                return data;
             }
         }
         else {
@@ -324,21 +319,6 @@ class CacheFinance {
         }
 
         return googleFinanceValues;
-    }
-
-    /**
-     * 
-     * @param {String} cacheKey 
-     * @param {Boolean} useShortCacheOnly
-     * @returns {any} null if not found
-     */
-    static getFinanceValueFromCache(cacheKey, useShortCacheOnly) {
-        const parsedData = CacheFinance.getFinanceValueFromShortCache(cacheKey);
-        if (parsedData !== null || useShortCacheOnly) {
-            return parsedData;
-        }
-
-        return CacheFinance.getFinanceValueFromLongCache(cacheKey);
     }
 
     /**
