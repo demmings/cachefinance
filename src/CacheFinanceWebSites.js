@@ -985,7 +985,8 @@ class GoogleWebSiteFinance {
 
     static extractYieldPct(html, symbol) {
         let data = null;
-        const divReg = new RegExp("Dividend yield.+?(\d+([.]\d*)?|[.]\d+)%<\/div>");
+        //  skipcq: JS-0097
+        const divReg = new RegExp(`Dividend yield.+?([0-9]+([.][0-9]*)?|[.][0-9]+)%<\/div>`);
         const dividendPercent = html.match(divReg);
 
         if (dividendPercent !== null && dividendPercent.length > 1) {
@@ -1003,6 +1004,7 @@ class GoogleWebSiteFinance {
 
     static extractStockPrice(html, symbol) {
         let data = null;
+        //  skipcq: JS-0097
         const re = new RegExp('data-last-price="(\\d*\\.?\\d*)?"');
 
         const priceMatch = html.match(re);
@@ -1029,11 +1031,12 @@ class GoogleWebSiteFinance {
         if (stockNameParts.length > 1) {
             const stock = stockNameParts[0];
 
+            //  skipcq: JS-0097
             const nameRegex = new RegExp(`<title>(.+?)\(${stock}\)`);
             const nameMatch = html.match(nameRegex);
             if (nameMatch !== null && nameMatch.length > 1) {
                 data = nameMatch[1].endsWith("(") ? nameMatch[1].slice(0, -1) : nameMatch[1];
-                Logger.log(`Google. Stock=${symbol}.NAME=${data.stockName}`);
+                Logger.log(`Google. Stock=${symbol}.NAME=${data}`);
             }
         }
 
