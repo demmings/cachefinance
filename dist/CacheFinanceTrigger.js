@@ -3484,21 +3484,33 @@ class GoogleWebSiteFinance {
             return data;
         }
 
-        let divReg = new RegExp(`Dividend yield.+?([0-9]+([.][0-9]*)?|[.][0-9]+)%<\/div>`);
-        let dividendPercent = html.match(divReg);
+        data.yieldPct = GoogleWebSiteFinance.extractYieldPct(html, symbol);
+        data.stockPrice = GoogleWebSiteFinance.extractStockPrice(html, symbol);
+        data.stockName = GoogleWebSiteFinance.extractStockName(html, symbol);
+
+        return data;
+    }
+
+    static extractYieldPct(html, symbol) {
+        let data = null;
+        const divReg = new RegExp(`Dividend yield.+?(\d+([.]\d*)?|[.]\d+)%<\/div>`);
+        const dividendPercent = html.match(divReg);
 
         if (dividendPercent !== null && dividendPercent.length > 1) {
             const tempPct = dividendPercent[1];
             Logger.log(`Google. Stock=${symbol}. PERCENT=${tempPct}`);
 
-            data.yieldPct = parseFloat(tempPct) / 100;
+            data = parseFloat(tempPct) / 100;
 
-            if (isNaN(data.yieldPct)) {
-                data.yieldPct = null;
+            if (isNaN(data)) {
+                data = null;
             }
         }
+        return data;
+    }
 
-
+    static extractStockPrice(html, symbol) {
+        let data = null;
         const re = new RegExp(`data-last-price="(\\d*\\.?\\d*)?"`);
 
         const priceMatch = html.match(re);
@@ -3507,13 +3519,18 @@ class GoogleWebSiteFinance {
             const tempPrice = priceMatch[1];
             Logger.log(`Google. Stock=${symbol}.PRICE=${tempPrice}`);
 
-            data.stockPrice = parseFloat(tempPrice);
+            data = parseFloat(tempPrice);
 
-            if (isNaN(data.stockPrice)) {
-                data.stockPrice = null;
+            if (isNaN(data)) {
+                data = null;
             }
         }
 
+        return data;
+    }
+
+    static extractStockName(html, symbol) {
+        let data = null;
         const baseSymbol = GoogleWebSiteFinance.getTicker(symbol);
         const stockNameParts = baseSymbol.split(":");
 
@@ -3523,7 +3540,7 @@ class GoogleWebSiteFinance {
             const nameRegex = new RegExp(`<title>(.+?)\(${stock}\)`);
             const nameMatch = html.match(nameRegex);
             if (nameMatch !== null && nameMatch.length > 1) {
-                data.stockName = nameMatch[1].endsWith("(") ? nameMatch[1].slice(0, -1) : nameMatch[1];
+                data = nameMatch[1].endsWith("(") ? nameMatch[1].slice(0, -1) : nameMatch[1];
                 Logger.log(`Google. Stock=${symbol}.NAME=${data.stockName}`);
             }
         }
