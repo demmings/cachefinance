@@ -197,12 +197,18 @@ class CacheFinanceUtils {                       // skipcq: JS-0128
 
     //  When you request a single column of data from getRange(), it is still a double array.
     //  Convert to single array for reguar array processing.
-    static convertRowsToSingleArray(doubleArray) {
+    /**
+     * 
+     * @param {any[][]} doubleArray 
+     * @param {Number} columnNumber 
+     * @returns {any[]}
+     */
+    static convertRowsToSingleArray(doubleArray, columnNumber=0) {
         if (! Array.isArray(doubleArray)) {
             return doubleArray;
         }
     
-        return doubleArray.map(item => item[0]);
+        return doubleArray.map(item => item[columnNumber]);
     }
 
     /**

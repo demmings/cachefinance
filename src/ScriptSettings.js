@@ -1,6 +1,7 @@
 /*  *** DEBUG START ***
 //  Remove comments for testing in NODE
 export { ScriptSettings, PropertyData };
+    import { CacheFinance } from "../CacheFinance.js";
 import { PropertiesService } from "../GasMocks.js";
 
 class Logger {
@@ -152,6 +153,10 @@ class ScriptSettings {      //  skipcq: JS-0128
             if (propertyOfThisApplication && (PropertyData.isExpired(propertyValue) || deleteAll)) {
                 PropertiesService.getScriptProperties().deleteProperty(key);
                 delete allProperties[key];
+
+                //  There is no way to iterate existing from 'short' cache, so we assume there is a
+                //  matching short cache entry and attempt to delete.
+                CacheFinance.deleteFromShortCache(key);
 
                 Logger.log(`Removing expired SCRIPT PROPERTY: key=${key}`);
 

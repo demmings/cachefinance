@@ -1585,6 +1585,10 @@ class ScriptSettings {      //  skipcq: JS-0128
                 PropertiesService.getScriptProperties().deleteProperty(key);
                 delete allProperties[key];
 
+                //  There is no way to iterate existing from 'short' cache, so we assume there is a
+                //  matching short cache entry and attempt to delete.
+                CacheFinance.deleteFromShortCache(key);
+
                 Logger.log(`Removing expired SCRIPT PROPERTY: key=${key}`);
 
                 deleteCount++;
@@ -2529,12 +2533,13 @@ class FinanceWebSites {
      */
     constructor() {
         this.siteList = [
-            new FinanceWebSite("FinnHub", FinnHub),           
+            new FinanceWebSite("FinnHub", FinnHub),
             new FinanceWebSite("TDEtf", TdMarketsEtf),
             new FinanceWebSite("TDStock", TdMarketsStock),
             new FinanceWebSite("Globe", GlobeAndMail),
             new FinanceWebSite("Yahoo", YahooFinance),
-            new FinanceWebSite("AlphaVantage", AlphaVantage)
+            new FinanceWebSite("AlphaVantage", AlphaVantage),
+            new FinanceWebSite("GoogleWebSiteFinance", GoogleWebSiteFinance)
         ];
 
         /** @property {Map<String, FinanceWebSite>} */
@@ -2591,6 +2596,9 @@ class FinanceWebSites {
             case "TSX":
             case "TSXV":
                 countryCode = "ca";
+                break;
+            case "SGX":
+                countryCode = "sg";
                 break;
             default:
                 countryCode = "ca";     //  We the north!
@@ -2767,7 +2775,7 @@ class TdMarketsEtf {
      * @returns {String}
      */
     static getApiKey() {
-        return "";    
+        return "";
     }
 
     /**
@@ -2820,7 +2828,7 @@ class TdMarketsStock {
      * @returns {String}
      */
     static getApiKey() {
-        return "";    
+        return "";
     }
 
     /**
@@ -2983,20 +2991,15 @@ class YahooFinance {
      * @returns {String}
      */
     static getURL(symbol, _attribute) {
-        const countryCode = FinanceWebSites.getTickerCountryCode(symbol);
-        if (countryCode !== "us") {
-            return "";
-        }
-
         return `https://finance.yahoo.com/quote/${YahooFinance.getTicker(symbol)}`;
     }
 
     /**
      * 
-     * @returns {Sting}
+     * @returns {String}
      */
     static getApiKey() {
-        return "";    
+        return "";
     }
 
     /**
@@ -3012,7 +3015,7 @@ class YahooFinance {
             return data;
         }
 
-        let dividendPercent = html.match(/"DIVIDEND_AND_YIELD-value">\d*\.\d*\s\((\d*\.\d*)%\)/);
+        let dividendPercent = html.match(/Forward Dividend &amp; Yield.+?\((\d*\.\d*)%\)/);
         if (dividendPercent === null) {
             dividendPercent = html.match(/TD_YIELD-value">(\d*\.\d*)%/);
         }
@@ -3044,6 +3047,13 @@ class YahooFinance {
             }
         }
 
+        const nameRegex = new RegExp(`<title>(.+?)\(${baseSymbol}\)`);
+        const nameMatch = html.match(nameRegex);
+        if (nameMatch !== null && nameMatch.length > 1) {
+            data.stockName = nameMatch[1].endsWith("(") ? nameMatch[1].slice(0, -1) : nameMatch[1];
+            Logger.log(`Yahoo. Stock=${symbol}.NAME=${data.stockName}`);
+        }
+
         return data;
     }
 
@@ -3072,6 +3082,8 @@ class YahooFinance {
             modifiedSymbol = symbolParts[1];
             if (symbolParts[0] === "TSE")
                 modifiedSymbol = `${symbolParts[1]}.TO`;
+            if (symbolParts[0] === "SGX")
+                modifiedSymbol = `${symbolParts[1]}.SI`;
 
         }
         return modifiedSymbol;
@@ -3118,7 +3130,7 @@ class GlobeAndMail {
      * @returns {String}
      */
     static getApiKey() {
-        return "";    
+        return "";
     }
 
     /**
@@ -3262,7 +3274,7 @@ class FinnHub {
      * @param {String} API_KEY
      * @returns {String}
      */
-    static getURL(symbol, attribute, API_KEY=null) {
+    static getURL(symbol, attribute, API_KEY = null) {
         if (attribute !== "PRICE") {
             return "";
         }
@@ -3284,7 +3296,7 @@ class FinnHub {
      * @returns {String}
      */
     static getApiKey() {
-        return FinanceWebSites.getApiKey("FINNHUB_API_KEY");    
+        return FinanceWebSites.getApiKey("FINNHUB_API_KEY");
     }
 
     /**
@@ -3358,7 +3370,7 @@ class AlphaVantage {
      * @param {String} API_KEY
      * @returns {String}
      */
-    static getURL(symbol, attribute, API_KEY=null) {
+    static getURL(symbol, attribute, API_KEY = null) {
         if (API_KEY === null) {
             return "";
         }
@@ -3380,7 +3392,7 @@ class AlphaVantage {
      * @returns {String}
      */
     static getApiKey() {
-        return FinanceWebSites.getApiKey("ALPHA_VANTAGE_API_KEY");    
+        return FinanceWebSites.getApiKey("ALPHA_VANTAGE_API_KEY");
     }
 
     /**
@@ -3412,6 +3424,138 @@ class AlphaVantage {
      */
     static getPropertyValue(key, defaultValue) {
         return defaultValue;
+    }
+}
+
+/**
+ * @classdesc Lookup for GOOGLE Finance site.
+ * weirdly, GOOGLEFINANCE() will fail for some stocks, but work on the website.
+ */
+class GoogleWebSiteFinance {
+    /**
+     * 
+     * @param {String} symbol 
+     * @returns {StockAttributes}
+     */
+    static getInfo(symbol) {
+        const URL = GoogleWebSiteFinance.getURL(symbol);
+
+        let html = null;
+        try {
+            html = UrlFetchApp.fetch(URL).getContentText();
+        }
+        catch (ex) {
+            return new StockAttributes();
+        }
+
+        Logger.log(`getInfo:  ${symbol}.  URL = ${URL}`);
+
+        return GoogleWebSiteFinance.parseResponse(html, symbol);
+    }
+
+    /**
+     * 
+     * @param {String} symbol 
+     * @param {String} _attribute
+     * @returns {String}
+     */
+    static getURL(symbol, _attribute) {
+        return `https://www.google.com/finance/quote/${GoogleWebSiteFinance.getTicker(symbol)}`;
+    }
+
+    /**
+     * 
+     * @returns {String}
+     */
+    static getApiKey() {
+        return "";
+    }
+
+    /**
+     * 
+     * @param {String} html 
+     * @param {String} symbol
+     * @returns {StockAttributes}
+     */
+    static parseResponse(html, symbol) {
+        const data = new StockAttributes();
+
+        if (symbol === '') {
+            return data;
+        }
+
+        let divReg = new RegExp(`Dividend yield.+?([0-9]+([.][0-9]*)?|[.][0-9]+)%<\/div>`);
+        let dividendPercent = html.match(divReg);
+
+        if (dividendPercent !== null && dividendPercent.length > 1) {
+            const tempPct = dividendPercent[1];
+            Logger.log(`Google. Stock=${symbol}. PERCENT=${tempPct}`);
+
+            data.yieldPct = parseFloat(tempPct) / 100;
+
+            if (isNaN(data.yieldPct)) {
+                data.yieldPct = null;
+            }
+        }
+
+
+        const re = new RegExp(`data-last-price="(\\d*\\.?\\d*)?"`);
+
+        const priceMatch = html.match(re);
+
+        if (priceMatch !== null && priceMatch.length === 2) {
+            const tempPrice = priceMatch[1];
+            Logger.log(`Google. Stock=${symbol}.PRICE=${tempPrice}`);
+
+            data.stockPrice = parseFloat(tempPrice);
+
+            if (isNaN(data.stockPrice)) {
+                data.stockPrice = null;
+            }
+        }
+
+        const baseSymbol = GoogleWebSiteFinance.getTicker(symbol);
+        const stockNameParts = baseSymbol.split(":");
+
+        if (stockNameParts.length > 1) {
+            const stock = stockNameParts[0];
+
+            const nameRegex = new RegExp(`<title>(.+?)\(${stock}\)`);
+            const nameMatch = html.match(nameRegex);
+            if (nameMatch !== null && nameMatch.length > 1) {
+                data.stockName = nameMatch[1].endsWith("(") ? nameMatch[1].slice(0, -1) : nameMatch[1];
+                Logger.log(`Google. Stock=${symbol}.NAME=${data.stockName}`);
+            }
+        }
+
+        return data;
+    }
+
+    /**
+     * 
+     * @param {String} key 
+     * @param {any} defaultValue 
+     * @returns {any}
+     */
+    static getPropertyValue(key, defaultValue) {
+        return defaultValue;
+    }
+
+    /**
+     * 
+     * @param {String} symbol 
+     * @returns {String}
+     */
+    static getTicker(symbol) {
+        let modifiedSymbol = symbol;
+        const colon = symbol.indexOf(":");
+
+        if (colon >= 0) {
+            const symbolParts = symbol.split(":");
+
+            modifiedSymbol = symbolParts[1] + ":" + symbolParts[0];
+        }
+        return modifiedSymbol;
     }
 }
 
@@ -3601,12 +3745,18 @@ class CacheFinanceUtils {                       // skipcq: JS-0128
 
     //  When you request a single column of data from getRange(), it is still a double array.
     //  Convert to single array for reguar array processing.
-    static convertRowsToSingleArray(doubleArray) {
+    /**
+     * 
+     * @param {any[][]} doubleArray 
+     * @param {Number} columnNumber 
+     * @returns {any[]}
+     */
+    static convertRowsToSingleArray(doubleArray, columnNumber=0) {
         if (! Array.isArray(doubleArray)) {
             return doubleArray;
         }
     
-        return doubleArray.map(item => item[0]);
+        return doubleArray.map(item => item[columnNumber]);
     }
 
     /**
