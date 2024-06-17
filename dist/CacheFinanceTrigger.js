@@ -3492,11 +3492,16 @@ class GoogleWebSiteFinance {
         return data;
     }
 
+    /**
+     * 
+     * @param {String} html 
+     * @param {String} symbol 
+     * @returns {Number}
+     */
     static extractYieldPct(html, symbol) {
         let data = null;
         //  skipcq: JS-0097
-        const divReg = new RegExp('Dividend yield.+?([0-9]+([.][0-9]*)?|[.][0-9]+)%<\/div>');
-        const dividendPercent = html.match(divReg);
+        const dividendPercent = html.match(/Dividend yield.+?(\d{0,4}\.?\d{0,4})%<\/div>/);
 
         if (dividendPercent !== null && dividendPercent.length > 1) {
             const tempPct = dividendPercent[1];
@@ -3511,12 +3516,16 @@ class GoogleWebSiteFinance {
         return data;
     }
 
+    /**
+     * 
+     * @param {String} html 
+     * @param {String} symbol 
+     * @returns {Number}
+     */
     static extractStockPrice(html, symbol) {
         let data = null;
         //  skipcq: JS-0097
-        const re = new RegExp('data-last-price="([0-9]+([.][0-9]*)?|[.][0-9]+)?"');
-
-        const priceMatch = html.match(re);
+        const priceMatch = html.match(/data-last-price="([0-9]+([.][0-9]*)?|[.][0-9]+)?"/);
 
         if (priceMatch !== null && priceMatch.length > 1) {
             const tempPrice = priceMatch[1];
@@ -3532,6 +3541,12 @@ class GoogleWebSiteFinance {
         return data;
     }
 
+    /**
+     * 
+     * @param {String} html 
+     * @param {String} symbol 
+     * @returns {String}
+     */
     static extractStockName(html, symbol) {
         let data = null;
         const baseSymbol = GoogleWebSiteFinance.getTicker(symbol);
