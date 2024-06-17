@@ -3047,6 +3047,7 @@ class YahooFinance {
             }
         }
 
+        // skipcq: JS-0097
         const nameRegex = new RegExp(`<title>(.+?)\(${baseSymbol}\)`);
         const nameMatch = html.match(nameRegex);
         if (nameMatch !== null && nameMatch.length > 1) {
@@ -3494,7 +3495,7 @@ class GoogleWebSiteFinance {
     static extractYieldPct(html, symbol) {
         let data = null;
         //  skipcq: JS-0097
-        const divReg = new RegExp(`Dividend yield.+?([0-9]+([.][0-9]*)?|[.][0-9]+)%<\/div>`);
+        const divReg = new RegExp('Dividend yield.+?([0-9]+([.][0-9]*)?|[.][0-9]+)%<\/div>');
         const dividendPercent = html.match(divReg);
 
         if (dividendPercent !== null && dividendPercent.length > 1) {
@@ -3573,7 +3574,7 @@ class GoogleWebSiteFinance {
         if (colon >= 0) {
             const symbolParts = symbol.split(":");
 
-            modifiedSymbol = symbolParts[1] + ":" + symbolParts[0];
+            modifiedSymbol = `${symbolParts[1]}:${symbolParts[0]}`;
         }
         return modifiedSymbol;
     }
