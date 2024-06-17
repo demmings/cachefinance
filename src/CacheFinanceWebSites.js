@@ -985,7 +985,7 @@ class GoogleWebSiteFinance {
 
     static extractYieldPct(html, symbol) {
         let data = null;
-        const divReg = new RegExp(`Dividend yield.+?(\d+([.]\d*)?|[.]\d+)%<\/div>`);
+        const divReg = new RegExp("Dividend yield.+?(\d+([.]\d*)?|[.]\d+)%<\/div>");
         const dividendPercent = html.match(divReg);
 
         if (dividendPercent !== null && dividendPercent.length > 1) {
@@ -1003,7 +1003,7 @@ class GoogleWebSiteFinance {
 
     static extractStockPrice(html, symbol) {
         let data = null;
-        const re = new RegExp(`data-last-price="(\\d*\\.?\\d*)?"`);
+        const re = new RegExp('data-last-price="(\\d*\\.?\\d*)?"');
 
         const priceMatch = html.match(re);
 
