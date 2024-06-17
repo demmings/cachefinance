@@ -3513,11 +3513,11 @@ class GoogleWebSiteFinance {
     static extractStockPrice(html, symbol) {
         let data = null;
         //  skipcq: JS-0097
-        const re = new RegExp('data-last-price="(\\d*\\.?\\d*)?"');
+        const re = new RegExp('data-last-price="([0-9]+([.][0-9]*)?|[.][0-9]+)?"');
 
         const priceMatch = html.match(re);
 
-        if (priceMatch !== null && priceMatch.length === 2) {
+        if (priceMatch !== null && priceMatch.length > 1) {
             const tempPrice = priceMatch[1];
             Logger.log(`Google. Stock=${symbol}.PRICE=${tempPrice}`);
 
