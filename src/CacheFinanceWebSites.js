@@ -977,6 +977,11 @@ class GoogleWebSiteFinance {
             return data;
         }
 
+        if (html.indexOf("We couldn't find any match for your search.") !== -1) {
+            Logger.log("www.google.com/finance:  We couldn't find any match for your search.");
+            return data;
+        }
+
         data.yieldPct = GoogleWebSiteFinance.extractYieldPct(html, symbol);
         data.stockPrice = GoogleWebSiteFinance.extractStockPrice(html, symbol);
         data.stockName = GoogleWebSiteFinance.extractStockName(html, symbol);
