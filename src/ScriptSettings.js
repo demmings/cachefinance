@@ -98,6 +98,11 @@ class ScriptSettings {      //  skipcq: JS-0128
      */
     static getAll(cacheKeys) {
         const values = [];
+
+        if (cacheKeys.length === 0) {
+            return values;
+        }
+        
         const allProperties = PropertiesService.getScriptProperties().getProperties();
 
         //  Removing properties is very slow, so remove only 1 at a time.  This is enough as this function is called frequently.

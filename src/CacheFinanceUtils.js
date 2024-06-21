@@ -52,22 +52,22 @@ class CacheFinanceUtils {                       // skipcq: JS-0128
     }
 
     /**
-     * 
+     * Create unique key/value key, filter out bad data, save to script settings (long cache).
      * @param {any[]} symbols 
      * @param {String} attribute 
      * @param {any[]} cacheData 
      */
-    static bulkLongCachePut(symbols, attribute, cacheData, daysToHold=7) {
+    static bulkLongCachePut(symbols, attribute, cacheData, daysToHold = 7) {
         const cacheKeys = CacheFinanceUtils.createCacheKeyList(symbols, attribute);
         const newCacheKeys = [];
         const newCacheData = [];
 
-        for (let i = 0; i < cacheKeys.length; i++) {
+        cacheKeys.forEach((key, i) => {
             if (CacheFinanceUtils.isValidGoogleValue(cacheData[i])) {
-                newCacheKeys.push(cacheKeys[i]);
+                newCacheKeys.push(key);
                 newCacheData.push(cacheData[i])
             }
-        }
+        });
 
         ScriptSettings.putAllKeysWithData(newCacheKeys, newCacheData, daysToHold);
     }
@@ -105,13 +105,10 @@ class CacheFinanceUtils {                       // skipcq: JS-0128
         const data = shortCache.getAll(cacheKeys);
         const cachedDataList = [];
 
-        for (const key of cacheKeys) {
-            let parsedData = null;
-            if (typeof data[key] !== 'undefined') {
-                parsedData = JSON.parse(data[key]);
-            }
+        cacheKeys.forEach(key => {
+            const parsedData = typeof data[key] === 'undefined' ? null : JSON.parse(data[key]);
             cachedDataList.push(parsedData);
-        }
+        });
 
         return cachedDataList;
     }
@@ -133,26 +130,6 @@ class CacheFinanceUtils {                       // skipcq: JS-0128
 
         const shortCache = CacheService.getScriptCache();
         shortCache.putAll(bulkData, cacheSeconds);
-    }
-
-    /**
-     * Puts list of data into cache using one API call.  Data is converted to JSON before it is updated.
-     * @param {String[]} cacheKeys 
-     * @param {any[]} cacheData 
-     * @param {Number} daysToHold
-     */
-    static putFinanceValuesIntoLongCache(cacheKeys, cacheData, daysToHold = 7) {
-        const newCacheKeys = [];
-        const newCacheData = [];
-
-        for (let i = 0; i < cacheKeys.length; i++) {
-            if (CacheFinanceUtils.isValidGoogleValue(cacheData[i])) {
-                newCacheKeys.push(cacheKeys[i]);
-                newCacheData.push(cacheData[i])
-            }
-        }
-
-        ScriptSettings.putAllKeysWithData(newCacheKeys, newCacheData, daysToHold);
     }
 
     /**
@@ -195,19 +172,18 @@ class CacheFinanceUtils {                       // skipcq: JS-0128
         return value !== null && typeof value !== 'undefined' && value !== "#N/A" && value !== '#ERROR!' && value !== '';
     }
 
-    //  When you request a single column of data from getRange(), it is still a double array.
-    //  Convert to single array for reguar array processing.
     /**
-     * 
+     * When you request a single column of data from getRange(), it is still a double array.
+     * Convert to single array for reguar array processing.
      * @param {any[][]} doubleArray 
      * @param {Number} columnNumber 
      * @returns {any[]}
      */
-    static convertRowsToSingleArray(doubleArray, columnNumber=0) {
-        if (! Array.isArray(doubleArray)) {
+    static convertRowsToSingleArray(doubleArray, columnNumber = 0) {
+        if (!Array.isArray(doubleArray)) {
             return doubleArray;
         }
-    
+
         return doubleArray.map(item => item[columnNumber]);
     }
 

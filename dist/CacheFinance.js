@@ -174,7 +174,7 @@ class CacheFinance {
         googleFinanceValues = CacheFinance.updateMissingValuesFromShortCache(symbols, attribute, googleFinanceValues);
 
         //  At this point, it will be mostly items that GOOGLE FINANCE just never works for.
-        let symbolsWithNoData = CacheFinance.getSymbolsWithNoValidData(symbols, googleFinanceValues);
+        const symbolsWithNoData = CacheFinance.getSymbolsWithNoValidData(symbols, googleFinanceValues);
 
         //  Make requests (very slow) from financial web sites to find missing data.
         const thirdPartyStockAtributes = ThirdPartyFinance.getMissingStockAttributesFromThirdParty(symbolsWithNoData, attribute);
@@ -186,12 +186,15 @@ class CacheFinance {
         CacheFinance.putAllStockAttributeDataIntoShortCache(thirdPartyStockAtributes, symbolsWithNoData, cacheSeconds);
 
         // Last, last resort.  Try to find in LONG CACHE.  This could be DAYS old, but it is better than invalid data.
-        symbolsWithNoData = CacheFinance.getSymbolsWithNoValidData(symbols, googleFinanceValues);
-        const longCacheValues = CacheFinanceUtils.bulkLongCacheGet(symbolsWithNoData, attribute);
-        googleFinanceValues = CacheFinance.updateMasterWithMissed(symbols, googleFinanceValues, symbolsWithNoData, longCacheValues);
+        const lastResortMissingStocks = CacheFinance.getSymbolsWithNoValidData(symbols, googleFinanceValues);
+        const longCacheValues = CacheFinanceUtils.bulkLongCacheGet(lastResortMissingStocks, attribute);
+        googleFinanceValues = CacheFinance.updateMasterWithMissed(symbols, googleFinanceValues, lastResortMissingStocks, longCacheValues);
 
-        //  Save everything we have found into the long cache for dire use cases in future.
-        CacheFinanceUtils.bulkLongCachePut(symbols, attribute, googleFinanceValues);
+        //  Everything we need was in the short cache, so no need to update long cache.
+        if (symbolsWithNoData.length > 0) {
+            //  Save everything we have found into the long cache for dire use cases in future.
+            CacheFinanceUtils.bulkLongCachePut(symbols, attribute, googleFinanceValues);
+        }
 
         return CacheFinanceUtils.convertSingleToDoubleArray(googleFinanceValues);
     }
@@ -230,22 +233,14 @@ class CacheFinance {
      * @returns {any[]}
      */
     static updateMissingValuesFromShortCache(symbols, attribute, googleFinanceValues) {
+        //  pulling from short cache is very slow, so if everything is GOOD it can be skipped.
         if (CacheFinance.isAllGoogleDefaultValuesValid(symbols, googleFinanceValues)) {
             return googleFinanceValues;
         }
 
-        const updatedFinanceValues = [];
-        const valueFromCache = CacheFinanceUtils.bulkShortCacheGet(symbols, attribute);
-        for (let i = 0; i < symbols.length; i++) {
-            if (CacheFinanceUtils.isValidGoogleValue(googleFinanceValues[i])) {
-                updatedFinanceValues.push(googleFinanceValues[i]);
-            } else {
-                const valueToUseFromCache = valueFromCache[i] !== null ? valueFromCache[i] : "#N/A";
-                updatedFinanceValues.push(valueToUseFromCache);
-            }
-        }
-
-        return updatedFinanceValues;
+        const valueFromCache = CacheFinanceUtils.bulkShortCacheGet(symbols, attribute).map(val => val === null ? "#N/A" : val);
+        
+        return googleFinanceValues.map((val, i) => CacheFinanceUtils.isValidGoogleValue(val) ? val : valueFromCache[i]);
     }
 
     /**
@@ -259,7 +254,7 @@ class CacheFinance {
             return false;
         }
 
-        return  CacheFinance.getSymbolsWithNoValidData(symbols, googleFinanceValues).length === 0;
+        return CacheFinance.getSymbolsWithNoValidData(symbols, googleFinanceValues).length === 0;
     }
 
     /**
@@ -269,15 +264,7 @@ class CacheFinance {
      * @returns {String[]}
      */
     static getSymbolsWithNoValidData(symbols, googleFinanceValues) {
-        const symbolsWithNoData = [];
-
-        for (let i = 0; i < symbols.length; i++) {
-            if (!CacheFinanceUtils.isValidGoogleValue(googleFinanceValues[i])) {
-                symbolsWithNoData.push(symbols[i]);
-            }
-        }
-
-        return symbolsWithNoData;
+        return symbols.filter((_sym, i) => !CacheFinanceUtils.isValidGoogleValue(googleFinanceValues[i]));
     }
 
     /**
@@ -311,11 +298,7 @@ class CacheFinance {
      */
     static getFinanceValueFromShortCache(cacheKey) {
         const shortCache = CacheService.getScriptCache();
-
         const data = shortCache.get(cacheKey);
-
-        //  Set to null while testing.  Remove when all is working.
-        // data = null;
 
         if (data !== null && data !== "#ERROR!") {
             Logger.log(`Found in Short CACHE: ${cacheKey}. Value=${data}`);
@@ -405,25 +388,25 @@ class CacheFinance {
      * @returns {Boolean}
      */
     static isTimeToUpdateCache(currentShortCacheValue, financialData) {
-        if (currentShortCacheValue !== null) {
-            const oldData = JSON.parse(currentShortCacheValue);
+        if (currentShortCacheValue === null)
+            return true;
 
-            if (oldData === financialData) {
-                Logger.log("GoogleFinance VALUE.  No Change in SHORT Cache.");
+        const oldData = JSON.parse(currentShortCacheValue);
+        if (oldData === financialData) {
+            Logger.log("GoogleFinance VALUE.  No Change in SHORT Cache.");
+            return false;
+        }
+
+        if (oldData > 0 && financialData > 0) {
+            const changeInPrice = oldData - financialData;
+            const percentChange = Math.abs(changeInPrice / oldData);
+            if (percentChange < 0.0025) {
+                Logger.log(`Short Cache Changed very little.  Old=${oldData} . New=${financialData}`);
                 return false;
             }
-
-            if (oldData > 0 && financialData > 0) {
-                const changeInPrice = oldData - financialData;
-                const percentChange = Math.abs(changeInPrice / oldData);
-                if (percentChange < 0.0025) {
-                    Logger.log(`Short Cache Changed very little.  Old=${oldData} . New=${financialData}`);
-                    return false;
-                }
-            }
-
-            Logger.log(`Short Cache Changed.  Old=${oldData} . New=${financialData}`);
         }
+
+        Logger.log(`Short Cache Changed.  Old=${oldData} . New=${financialData}`);
 
         return true;
     }
@@ -553,6 +536,11 @@ class ScriptSettings {      //  skipcq: JS-0128
      */
     static getAll(cacheKeys) {
         const values = [];
+
+        if (cacheKeys.length === 0) {
+            return values;
+        }
+        
         const allProperties = PropertiesService.getScriptProperties().getProperties();
 
         //  Removing properties is very slow, so remove only 1 at a time.  This is enough as this function is called frequently.
@@ -745,6 +733,10 @@ class FinanceWebsiteSearch {
      * @returns {StockAttributes[]}
      */
     static getAll(symbols, attribute) {
+        if (symbols.length === 0) {
+            return [];
+        }
+        
         const MAX_TIME_FOR_FETCH_Ms = 25000;        //  Custom function times out at 30 seconds, so we need to limit.
         const bestStockSites = FinanceWebsiteSearch.readBestStockWebsites();
         const siteURLs = FinanceWebsiteSearch.getAllStockWebSiteFunctions(symbols, attribute, bestStockSites);
@@ -2665,22 +2657,22 @@ class CacheFinanceUtils {                       // skipcq: JS-0128
     }
 
     /**
-     * 
+     * Create unique key/value key, filter out bad data, save to script settings (long cache).
      * @param {any[]} symbols 
      * @param {String} attribute 
      * @param {any[]} cacheData 
      */
-    static bulkLongCachePut(symbols, attribute, cacheData, daysToHold=7) {
+    static bulkLongCachePut(symbols, attribute, cacheData, daysToHold = 7) {
         const cacheKeys = CacheFinanceUtils.createCacheKeyList(symbols, attribute);
         const newCacheKeys = [];
         const newCacheData = [];
 
-        for (let i = 0; i < cacheKeys.length; i++) {
+        cacheKeys.forEach((key, i) => {
             if (CacheFinanceUtils.isValidGoogleValue(cacheData[i])) {
-                newCacheKeys.push(cacheKeys[i]);
+                newCacheKeys.push(key);
                 newCacheData.push(cacheData[i])
             }
-        }
+        });
 
         ScriptSettings.putAllKeysWithData(newCacheKeys, newCacheData, daysToHold);
     }
@@ -2718,13 +2710,10 @@ class CacheFinanceUtils {                       // skipcq: JS-0128
         const data = shortCache.getAll(cacheKeys);
         const cachedDataList = [];
 
-        for (const key of cacheKeys) {
-            let parsedData = null;
-            if (typeof data[key] !== 'undefined') {
-                parsedData = JSON.parse(data[key]);
-            }
+        cacheKeys.forEach(key => {
+            const parsedData = typeof data[key] === 'undefined' ? null : JSON.parse(data[key]);
             cachedDataList.push(parsedData);
-        }
+        });
 
         return cachedDataList;
     }
@@ -2746,26 +2735,6 @@ class CacheFinanceUtils {                       // skipcq: JS-0128
 
         const shortCache = CacheService.getScriptCache();
         shortCache.putAll(bulkData, cacheSeconds);
-    }
-
-    /**
-     * Puts list of data into cache using one API call.  Data is converted to JSON before it is updated.
-     * @param {String[]} cacheKeys 
-     * @param {any[]} cacheData 
-     * @param {Number} daysToHold
-     */
-    static putFinanceValuesIntoLongCache(cacheKeys, cacheData, daysToHold = 7) {
-        const newCacheKeys = [];
-        const newCacheData = [];
-
-        for (let i = 0; i < cacheKeys.length; i++) {
-            if (CacheFinanceUtils.isValidGoogleValue(cacheData[i])) {
-                newCacheKeys.push(cacheKeys[i]);
-                newCacheData.push(cacheData[i])
-            }
-        }
-
-        ScriptSettings.putAllKeysWithData(newCacheKeys, newCacheData, daysToHold);
     }
 
     /**
@@ -2808,19 +2777,18 @@ class CacheFinanceUtils {                       // skipcq: JS-0128
         return value !== null && typeof value !== 'undefined' && value !== "#N/A" && value !== '#ERROR!' && value !== '';
     }
 
-    //  When you request a single column of data from getRange(), it is still a double array.
-    //  Convert to single array for reguar array processing.
     /**
-     * 
+     * When you request a single column of data from getRange(), it is still a double array.
+     * Convert to single array for reguar array processing.
      * @param {any[][]} doubleArray 
      * @param {Number} columnNumber 
      * @returns {any[]}
      */
-    static convertRowsToSingleArray(doubleArray, columnNumber=0) {
-        if (! Array.isArray(doubleArray)) {
+    static convertRowsToSingleArray(doubleArray, columnNumber = 0) {
+        if (!Array.isArray(doubleArray)) {
             return doubleArray;
         }
-    
+
         return doubleArray.map(item => item[columnNumber]);
     }
 

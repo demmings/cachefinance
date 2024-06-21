@@ -76,6 +76,10 @@ class FinanceWebsiteSearch {
      * @returns {StockAttributes[]}
      */
     static getAll(symbols, attribute) {
+        if (symbols.length === 0) {
+            return [];
+        }
+        
         const MAX_TIME_FOR_FETCH_Ms = 25000;        //  Custom function times out at 30 seconds, so we need to limit.
         const bestStockSites = FinanceWebsiteSearch.readBestStockWebsites();
         const siteURLs = FinanceWebsiteSearch.getAllStockWebSiteFunctions(symbols, attribute, bestStockSites);
