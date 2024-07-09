@@ -74,6 +74,10 @@ function CACHEFINANCES(symbols, attribute = "price", defaultValues = [], webSite
         throw new Error("Stock symbol RANGE must match default values range.");
     }
 
+    if (defaultValues === undefined || typeof defaultValues === 'string') {
+        defaultValues = [];
+    }
+
     const trimmedSymbols = CacheFinanceUtils.removeEmptyRecordsAtEndOfTable(symbols);
     const trimmedValues = CacheFinanceUtils.removeEmptyRecordsAtEndOfTable(defaultValues);
 
@@ -1475,7 +1479,6 @@ class ScriptSettings {      //  skipcq: JS-0128
     }
 
     /**
-     * 
      * @param {Object} propertyDataObject 
      * @param {Number} daysToHold 
      */
@@ -1618,7 +1621,6 @@ class PropertyData {
     }
 
     /**
-     * 
      * @param {PropertyData} obj 
      * @returns {any}
      */
@@ -3624,7 +3626,7 @@ class CacheFinanceUtils {                       // skipcq: JS-0128
      * @param {any[]} newCacheData 
      */
     static bulkShortCachePut(symbols, attribute, newCacheData, cacheSeconds) {
-        if (symbols.length === 0) {
+        if (symbols.length === 0 || newCacheData.length == 0) {
             return;
         }
 

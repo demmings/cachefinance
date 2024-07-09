@@ -61,7 +61,6 @@ class ScriptSettings {      //  skipcq: JS-0128
     }
 
     /**
-     * 
      * @param {Object} propertyDataObject 
      * @param {Number} daysToHold 
      */
@@ -204,7 +203,6 @@ class PropertyData {
     }
 
     /**
-     * 
      * @param {PropertyData} obj 
      * @returns {any}
      */

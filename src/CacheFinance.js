@@ -91,6 +91,10 @@ function CACHEFINANCES(symbols, attribute = "price", defaultValues = [], webSite
         throw new Error("Stock symbol RANGE must match default values range.");
     }
 
+    if (defaultValues === undefined || typeof defaultValues === 'string') {
+        defaultValues = [];
+    }
+
     const trimmedSymbols = CacheFinanceUtils.removeEmptyRecordsAtEndOfTable(symbols);
     const trimmedValues = CacheFinanceUtils.removeEmptyRecordsAtEndOfTable(defaultValues);
 
