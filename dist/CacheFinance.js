@@ -2650,7 +2650,7 @@ class CacheFinanceUtils {                       // skipcq: JS-0128
      * @param {any[]} newCacheData 
      */
     static bulkShortCachePut(symbols, attribute, newCacheData, cacheSeconds) {
-        if (symbols.length === 0 || newCacheData.length == 0) {
+        if (symbols.length === 0 || newCacheData.length === 0) {
             return;
         }
 
