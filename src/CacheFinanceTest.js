@@ -1,7 +1,7 @@
 /*  *** DEBUG START ***
 //  Remove comments for testing in NODE
 
-import { TdMarketResearch, GlobeAndMail, YahooFinance, StockAttributes } from "./CacheFinanceWebSites.js";
+import { TdMarketResearch, GlobeAndMail, YahooFinance, GoogleWebSiteFinance, FinnHub, AlphaVantage, StockAttributes } from "./CacheFinanceWebSites.js";
 import { ThirdPartyFinance, FinanceWebsiteSearch } from "./CacheFinance3rdParty.js";
 import { CACHEFINANCE, CacheFinance } from "./CacheFinance.js";
 export { cacheFinanceTest };
@@ -36,43 +36,23 @@ class CacheFinanceTest {
      * @returns {any[][]}
      */
     execute() {
-        this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "NYSEARCA:SHYG");
-        this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "TSE:MEG");
+        this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "NYSEARCA:VOO");
+        this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "TSE:CJP");
         this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "TSE:RY");
-        this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "NASDAQ:MSFT");
+        this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "NASDAQ:VTC");
         
         this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "NYSEARCA:SHYG");
         this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:ZTL");
-        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:DFN-A");
-        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:DFN-A", "ALL", "STOCK");
-        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "NASDAQ:MSFT", "ALL", "STOCK");
         this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:RY", "ALL", "STOCK");
 
-        this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "NYSEARCA:SHYG");
+        this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "NYSEARCA:VOO");
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:FTN-A");
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:RY");
-        this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "NASDAQ:MSFT");
 
-        const plan = new FinanceWebsiteSearch();
-        //  Make fresh lookup plans.
-        FinanceWebsiteSearch.deleteLookupPlan("TSE:RY");
-        FinanceWebsiteSearch.deleteLookupPlan("NASDAQ:BNDX");
-        FinanceWebsiteSearch.deleteLookupPlan("TSE:ZTL");
+        this.cacheTestRun.run("GoogleWebSiteFinance", GoogleWebSiteFinance.getInfo, "TSE:RY");
 
-        plan.getLookupPlan("TSE:RY", "");
-        plan.getLookupPlan("NASDAQ:BNDX", "");
-        plan.getLookupPlan("TSE:ZTL", "");
-
-        this.cacheTestRun.run("OptimalSite", ThirdPartyFinance.get, "TSE:RY", "PRICE");
-        this.cacheTestRun.run("OptimalSite", ThirdPartyFinance.get, "NASDAQ:BNDX", "PRICE");
-        this.cacheTestRun.run("OptimalSite", ThirdPartyFinance.get, "NASDAQ:BNDX", "NAME");
-        this.cacheTestRun.run("OptimalSite", ThirdPartyFinance.get, "NASDAQ:BNDX", "YIELDPCT");
-        this.cacheTestRun.run("OptimalSite", ThirdPartyFinance.get, "TSE:ZTL", "PRICE");
-
-        CacheFinance.deleteFromCache("TSE:RY", "PRICE");
-        this.cacheTestRun.run("CACHEFINANCE - not cached", CACHEFINANCE, "TSE:RY", "PRICE", "##NotSet##");
-        this.cacheTestRun.run("CACHEFINANCE - cached", CACHEFINANCE, "TSE:RY", "PRICE", "##NotSet##");
-
+        this.cacheTestRun.run("Finnhub", FinnHub.getInfo, "NYSEARCA:VOO", "PRICE");
+        this.cacheTestRun.run("AlphaVantage", AlphaVantage.getInfo, "NYSEARCA:VOO", "PRICE");
 
         return this.cacheTestRun.getTestRunResults();
     }

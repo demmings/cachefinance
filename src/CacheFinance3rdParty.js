@@ -163,9 +163,10 @@ class FinanceWebsiteSearch {
         for (const symbol of symbols) {
             const stockURL = new StockWebURL(symbol);
             const bestSite = bestStockSites[CacheFinanceUtils.makeCacheKey(symbol, attribute)];
+            const skipSite = bestStockSites[CacheFinanceUtils.makeIgnoreSiteCacheKey(symbol, attribute)];
 
             for (const site of siteList) {
-                stockURL.addSiteURL(site.siteName, site.siteName === bestSite, site.siteObject.getURL(symbol, attribute, apiMap.get(site.siteName)), site.siteObject.parseResponse);
+                stockURL.addSiteURL(site.siteName, bestSite, skipSite, site.siteObject.getURL(symbol, attribute, apiMap.get(site.siteName)), site.siteObject.parseResponse);
             }
 
             stockURLs.push(stockURL);
@@ -191,7 +192,7 @@ class FinanceWebsiteSearch {
      */
     static writeBestStockWebsites(siteObject) {
         const longCache = new ScriptSettings();
-        longCache.put("CACHE_WEBSITES", siteObject, 365);    
+        longCache.put("CACHE_WEBSITES", siteObject, 1825);    
     }
 
 
@@ -330,12 +331,15 @@ class StockWebURL {
      * @param {Object} parseResponseFunction 
      * @returns 
      */
-    addSiteURL(siteName, bestSite, URL, parseResponseFunction) {
+    addSiteURL(siteName, bestSite, skipSite, URL, parseResponseFunction) {
         if (URL.trim() === '') {
             return;
         } 
 
-        if (bestSite) {
+        if (siteName === skipSite) {
+            return;
+        }
+        else if (siteName === bestSite) {
             this.siteName.unshift(siteName);
             this.siteURL.unshift(URL);
             this.parseFunction.unshift(parseResponseFunction);

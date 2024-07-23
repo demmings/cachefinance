@@ -139,7 +139,11 @@ class CacheFinanceUtils {                       // skipcq: JS-0128
      * @returns {String}
      */
     static makeCacheKey(symbol, attribute) {
-        return `${attribute}|${symbol}`;
+        return `${attribute.toUpperCase()}|${symbol.toUpperCase()}`;
+    }
+
+    static makeIgnoreSiteCacheKey(symbol, attribute) {
+        return `IGNORE|${CacheFinanceUtils.makeCacheKey(symbol, attribute)}`;
     }
 
     /**

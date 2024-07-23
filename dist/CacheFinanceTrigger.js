@@ -4,14 +4,11 @@ const GOOGLEFINANCE_PARAM_NOT_USED = "##NotSet##";
 //  Function only used for testing in google sheets app script.
 // skipcq: JS-0128
 function testYieldPct() {
-    const val = CACHEFINANCE("TSE:FTN-A", "yieldpct");        // skipcq: JS-0128
+    const val = CACHEFINANCE("TSE:CJP", "yieldpct");        // skipcq: JS-0128
     Logger.log(`Test CacheFinance FTN-A(yieldpct)=${val}`);
 }
 
 function testCacheFinances() {                                  // skipcq: JS-0128
-    // const symbols = [["ABC"], ["DEF"], ["GHI"], ["JKL"], ["TSE:FLJA"]];
-    // const data = [[11.1], [22.2], [33.3], [44.4], ["#N/A"]];
-
     const symbols = SpreadsheetApp.getActiveSpreadsheet().getRangeByName("A30:A165").getValues();
     const data = SpreadsheetApp.getActiveSpreadsheet().getRangeByName("E30:E165").getValues();
 
@@ -24,36 +21,32 @@ function testCacheFinances() {                                  // skipcq: JS-01
 
 /**
  * Enhancement to GOOGLEFINANCE function for stock/ETF symbols that a) return "#N/A" (temporary or consistently), b) data never available like 'yieldpct' for ETF's. 
- * @param {string} symbol 
+ * @param {string} symbol - stock ticket with exchange (e.g.  "NYSEARCA:VOO")
  * @param {string} attribute - ["price", "yieldpct", "name"] - 
- * Special Attributes.
- *  "TEST" - returns test results from 3rd party sites.
- *  "CLEARCACHE" - Removes all Script Properties (used for long term cache) created by CACHEFINANCE
- * @param {any} googleFinanceValue - Optional.  Use GOOGLEFINANCE() to get value, if '#N/A' will read cache.
+ * @param {any} googleFinanceValue - Optional.  Use GOOGLEFINANCE() to get default value, if '#N/A' will read cache.
+ * BACKDOOR commands are entered using this parameter.
+ *  "?" - List all backdoor abilities (SET, GET, SETBLOCKED, GETBLOCKED, LIST, REMOVE, CLEARCACHE, TEST)
+ * e.g. =CACHEFINANCE("", "", "CLEARCACHE") or =CACHEFINANCE("TSE:CJP", "price", "GET")
+ * @param {String} cmdOption - Option parameter used only with backdoor commands.
  * @returns {any}
  * @customfunction
  */
-function CACHEFINANCE(symbol, attribute = "price", googleFinanceValue = GOOGLEFINANCE_PARAM_NOT_USED) {         // skipcq: JS-0128
+function CACHEFINANCE(symbol, attribute = "price", googleFinanceValue = "", cmdOption = "") {         // skipcq: JS-0128
     Logger.log(`CACHEFINANCE:${symbol}=${attribute}. Google=${googleFinanceValue}`);
 
-    if (attribute.toUpperCase() === "TEST") {
-        return cacheFinanceTest();
-    }
-
-    if (attribute.toUpperCase() === "CLEARCACHE") {
-        ScriptSettings.expire(true);
-        return 'Cache Cleared';
+    //  Special inputs that perform something other than a finance request.
+    const providerUpdateMessage = CacheFinance.backDoorCommands(symbol, attribute, googleFinanceValue, cmdOption);
+    if (providerUpdateMessage !== null) {
+        return providerUpdateMessage;
     }
 
     if (symbol === '' || attribute === '') {
         return '';
     }
 
-    if (typeof googleFinanceValue === 'string' && googleFinanceValue === '') {
-        googleFinanceValue = GOOGLEFINANCE_PARAM_NOT_USED;
-    }
+    const data = CACHEFINANCES([[symbol]], attribute, [[googleFinanceValue]]);
 
-    return CacheFinance.getFinanceData(symbol, attribute, googleFinanceValue);
+    return data[0][0];
 }
 
 /**
@@ -62,7 +55,7 @@ function CACHEFINANCE(symbol, attribute = "price", googleFinanceValue = GOOGLEFI
  * @param {String} attribute - ["price", "yieldpct", "name"]
  * @param {any[][]} defaultValues Default values from GoogleFinance()
  * @param {Number} webSiteLookupCacheSeconds Min. time between Web Lookups (max 21600 seconds)
- * @returns 
+ * @returns {any}
  * @customfunction
  */
 function CACHEFINANCES(symbols, attribute = "price", defaultValues = [], webSiteLookupCacheSeconds = -1) {         // skipcq: JS-0128
@@ -167,7 +160,7 @@ class CacheFinance {
      * @param {Number} webSiteLookupCacheSeconds
      * @returns {any[][]}
      */
-    static getBulkFinanceData(symbols, attribute, googleFinanceValues, webSiteLookupCacheSeconds) {
+    static getBulkFinanceData(symbols, attribute, googleFinanceValues, webSiteLookupCacheSeconds = -1) {
         const MAX_SHORT_CACHE_SECONDS = 21600;      // For VALID GOOGLEFINANCE values.
         const MAX_SHORT_CACHE_THIRD_PARTY = 1200;   // This will force a lookup every 20 minutes for stocks NEVER found in GOOGLEFINANCE()
 
@@ -243,7 +236,7 @@ class CacheFinance {
         }
 
         const valueFromCache = CacheFinanceUtils.bulkShortCacheGet(symbols, attribute).map(val => val === null ? "#N/A" : val);
-        
+
         return googleFinanceValues.map((val, i) => CacheFinanceUtils.isValidGoogleValue(val) ? val : valueFromCache[i]);
     }
 
@@ -451,6 +444,196 @@ class CacheFinance {
         if (currentShortCacheValue !== null) {
             shortCache.remove(key);
         }
+    }
+
+    /**
+     * 
+     * @param {String} symbol 
+     * @param {String} attribute 
+     * @param {String} googleValue 
+     * @param {String} cmdOption
+     * @returns 
+     */
+    static backDoorCommands(symbol, attribute, googleValue, cmdOption) {
+        const commandStr = googleValue.toString().toUpperCase().trim();
+        cmdOption = cmdOption.toString().toUpperCase().trim();
+
+        switch (commandStr) {
+            case "":
+                return null;
+
+            case "?":
+            case "HELP":
+                return [["Valid commands in 3'rd parameter.  Erase after run to prevent future runs."],
+                ["    ? (display help)"],
+                ["    TEST (tests web sites)"],
+                ["    CLEARCACHE (remove cache - run again if timeout. If symbol/attribute blank - removes all)"],
+                ["    REMOVE (pref. site set as do not use site for symbol/attribute)"],
+                ["    LIST (show all supported web lookups)"],
+                ["    GET (current pref. site for symbol/attribute)"],
+                ["    GETBLOCKED (current blocked site for symbol/attribute)"],
+                ["    SET (4'th parm is set to pref. site for symbol/attribute)"],
+                ["    SETBLOCKED (4'th parm is set to blocked site for symbol/attribute)"]];
+
+            case "TEST":
+                return cacheFinanceTest();
+
+            case "CLEARCACHE":
+                if (symbol !== "" && attribute !== "") {
+                    CacheFinance.deleteFromCache(symbol, attribute);
+                }
+                else {
+                    ScriptSettings.expire(true);
+                }
+                return 'Cache Cleared';
+
+            case "REMOVE":
+                return CacheFinance.removeCurrentProviderAsFavourite(symbol, attribute);
+
+            case "GET":
+                return CacheFinance.getCurrentProvider(symbol, attribute);
+
+            case "GETBLOCKED":
+                return CacheFinance.getBlockedProvider(symbol, attribute);
+
+            case "SET":
+                if (cmdOption !== "" && CacheFinance.listProviders().indexOf(cmdOption) === -1) {
+                    return "Invalid provider name.  No change made.";
+                }
+                CacheFinance.setProviderAsFavourite(symbol, attribute, cmdOption);
+                return `New provider (${cmdOption}) set as default for: ${symbol} ${attribute}`;
+
+            case "SETBLOCKED":
+                if (cmdOption !== "" && CacheFinance.listProviders().indexOf(cmdOption) === -1) {
+                    return "Invalid provider name.  No change made.";
+                }
+                CacheFinance.setBlockedProvider(symbol, attribute, cmdOption);
+                return `New provider (${cmdOption}) set as blocked for: ${symbol} ${attribute}`;
+
+            case "LIST":
+                return CacheFinanceUtils.convertSingleToDoubleArray(CacheFinance.listProviders());
+        }
+
+        return null;
+    }
+
+    /**
+     * 
+     * @param {String} symbol 
+     * @param {String} attribute 
+     * @returns {String}
+     */
+    static removeCurrentProviderAsFavourite(symbol, attribute) {
+        CacheFinance.deleteFromCache(symbol, attribute);
+        let statusMessage = "";
+
+        const bestStockSites = FinanceWebsiteSearch.readBestStockWebsites();
+        const objectKey = CacheFinanceUtils.makeCacheKey(symbol, attribute);
+        Logger.log(`Removing current site for ${objectKey}`);
+
+        if (typeof bestStockSites[objectKey] !== 'undefined') {
+            const badSite = bestStockSites[objectKey];
+            statusMessage = "Site removed for lookups: " + badSite;
+            Logger.log(`Removing site from list: ${badSite}`);
+            delete bestStockSites[objectKey];
+            bestStockSites[CacheFinanceUtils.makeIgnoreSiteCacheKey(symbol, attribute)] = badSite;
+            FinanceWebsiteSearch.writeBestStockWebsites(bestStockSites);
+        }
+        else {
+            statusMessage = `Currently no preferred site for ${symbol} ${attribute}`;
+        }
+
+        return statusMessage;
+    }
+
+    /**
+     * 
+     * @param {String} symbol 
+     * @param {String} attribute 
+     * @param {String} siteName 
+     */
+    static setProviderAsFavourite(symbol, attribute, siteName) {
+        const objectKey = CacheFinanceUtils.makeCacheKey(symbol, attribute);
+        CacheFinance.setProviderData(objectKey, siteName);
+    }
+
+    /**
+     * Sets ONE web provider to NEVER be used for symbol/attribute.
+     * @param {String} symbol 
+     * @param {String} attribute 
+     * @param {String} siteName 
+     */
+    static setBlockedProvider(symbol, attribute, siteName) {
+        const objectKey = CacheFinanceUtils.makeIgnoreSiteCacheKey(symbol, attribute);
+        CacheFinance.setProviderData(objectKey, siteName);
+    }
+
+    /**
+     * 
+     * @param {String} objectKey 
+     * @param {String} siteName 
+     */
+    static setProviderData(objectKey, siteName) {
+        const bestStockSites = FinanceWebsiteSearch.readBestStockWebsites();
+        bestStockSites[objectKey] = siteName;
+
+        if (siteName === "") {
+            delete bestStockSites[objectKey];
+        }
+
+        FinanceWebsiteSearch.writeBestStockWebsites(bestStockSites);
+    }
+
+    /**
+     * Returns the PREFERRED web site to find symbol/attribute.
+     * @param {String} symbol 
+     * @param {String} attribute 
+     * @returns {String}
+     */
+    static getCurrentProvider(symbol, attribute) {
+        const objectKey = CacheFinanceUtils.makeCacheKey(symbol, attribute);
+
+        return CacheFinance.getProviderData(objectKey);
+    }
+
+    /**
+     * Returns the web site provider that is never used to access symbol/attribute.
+     * @param {String} symbol 
+     * @param {String} attribute 
+     * @returns {String}
+     */
+    static getBlockedProvider(symbol, attribute) {
+        const objectKey = CacheFinanceUtils.makeIgnoreSiteCacheKey(symbol, attribute);
+
+        return CacheFinance.getProviderData(objectKey);
+    }
+
+    /**
+     * 
+     * @param {String} objectKey 
+     * @returns {String}
+     */
+    static getProviderData(objectKey) {
+        let currentSite = "No site set.";
+        const bestStockSites = FinanceWebsiteSearch.readBestStockWebsites();
+
+        if (typeof bestStockSites[objectKey] !== 'undefined') {
+            currentSite = bestStockSites[objectKey];
+        }
+
+        return currentSite;
+    }
+
+    /**
+     * Returns all web site ID's used to retrieve stock info.
+     * @returns {String[]}
+     */
+    static listProviders() {
+        const webSites = new FinanceWebSites();
+
+        const siteNames = webSites.siteList.map(site => site._siteName);
+
+        return siteNames;
     }
 }
 
@@ -1798,9 +1981,10 @@ class FinanceWebsiteSearch {
         for (const symbol of symbols) {
             const stockURL = new StockWebURL(symbol);
             const bestSite = bestStockSites[CacheFinanceUtils.makeCacheKey(symbol, attribute)];
+            const skipSite = bestStockSites[CacheFinanceUtils.makeIgnoreSiteCacheKey(symbol, attribute)];
 
             for (const site of siteList) {
-                stockURL.addSiteURL(site.siteName, site.siteName === bestSite, site.siteObject.getURL(symbol, attribute, apiMap.get(site.siteName)), site.siteObject.parseResponse);
+                stockURL.addSiteURL(site.siteName, bestSite, skipSite, site.siteObject.getURL(symbol, attribute, apiMap.get(site.siteName)), site.siteObject.parseResponse);
             }
 
             stockURLs.push(stockURL);
@@ -1826,7 +2010,7 @@ class FinanceWebsiteSearch {
      */
     static writeBestStockWebsites(siteObject) {
         const longCache = new ScriptSettings();
-        longCache.put("CACHE_WEBSITES", siteObject, 365);    
+        longCache.put("CACHE_WEBSITES", siteObject, 1825);    
     }
 
 
@@ -1965,12 +2149,15 @@ class StockWebURL {
      * @param {Object} parseResponseFunction 
      * @returns 
      */
-    addSiteURL(siteName, bestSite, URL, parseResponseFunction) {
+    addSiteURL(siteName, bestSite, skipSite, URL, parseResponseFunction) {
         if (URL.trim() === '') {
             return;
         } 
 
-        if (bestSite) {
+        if (siteName === skipSite) {
+            return;
+        }
+        else if (siteName === bestSite) {
             this.siteName.unshift(siteName);
             this.siteURL.unshift(URL);
             this.parseFunction.unshift(parseResponseFunction);
@@ -2273,43 +2460,23 @@ class CacheFinanceTest {
      * @returns {any[][]}
      */
     execute() {
-        this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "NYSEARCA:SHYG");
-        this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "TSE:MEG");
+        this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "NYSEARCA:VOO");
+        this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "TSE:CJP");
         this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "TSE:RY");
-        this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "NASDAQ:MSFT");
+        this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "NASDAQ:VTC");
         
         this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "NYSEARCA:SHYG");
         this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:ZTL");
-        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:DFN-A");
-        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:DFN-A", "ALL", "STOCK");
-        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "NASDAQ:MSFT", "ALL", "STOCK");
         this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:RY", "ALL", "STOCK");
 
-        this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "NYSEARCA:SHYG");
+        this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "NYSEARCA:VOO");
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:FTN-A");
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:RY");
-        this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "NASDAQ:MSFT");
 
-        const plan = new FinanceWebsiteSearch();
-        //  Make fresh lookup plans.
-        FinanceWebsiteSearch.deleteLookupPlan("TSE:RY");
-        FinanceWebsiteSearch.deleteLookupPlan("NASDAQ:BNDX");
-        FinanceWebsiteSearch.deleteLookupPlan("TSE:ZTL");
+        this.cacheTestRun.run("GoogleWebSiteFinance", GoogleWebSiteFinance.getInfo, "TSE:RY");
 
-        plan.getLookupPlan("TSE:RY", "");
-        plan.getLookupPlan("NASDAQ:BNDX", "");
-        plan.getLookupPlan("TSE:ZTL", "");
-
-        this.cacheTestRun.run("OptimalSite", ThirdPartyFinance.get, "TSE:RY", "PRICE");
-        this.cacheTestRun.run("OptimalSite", ThirdPartyFinance.get, "NASDAQ:BNDX", "PRICE");
-        this.cacheTestRun.run("OptimalSite", ThirdPartyFinance.get, "NASDAQ:BNDX", "NAME");
-        this.cacheTestRun.run("OptimalSite", ThirdPartyFinance.get, "NASDAQ:BNDX", "YIELDPCT");
-        this.cacheTestRun.run("OptimalSite", ThirdPartyFinance.get, "TSE:ZTL", "PRICE");
-
-        CacheFinance.deleteFromCache("TSE:RY", "PRICE");
-        this.cacheTestRun.run("CACHEFINANCE - not cached", CACHEFINANCE, "TSE:RY", "PRICE", "##NotSet##");
-        this.cacheTestRun.run("CACHEFINANCE - cached", CACHEFINANCE, "TSE:RY", "PRICE", "##NotSet##");
-
+        this.cacheTestRun.run("Finnhub", FinnHub.getInfo, "NYSEARCA:VOO", "PRICE");
+        this.cacheTestRun.run("AlphaVantage", AlphaVantage.getInfo, "NYSEARCA:VOO", "PRICE");
 
         return this.cacheTestRun.getTestRunResults();
     }
@@ -3253,7 +3420,7 @@ class FinnHub {
         let jsonStr = null;
         try {
             jsonStr = UrlFetchApp.fetch(URL).getContentText();
-            data = FinnHub.parseResponse(jsonStr);
+            data = FinnHub.parseResponse(jsonStr, symbol, attribute);
         }
         catch (ex) {
             return data;
@@ -3722,7 +3889,11 @@ class CacheFinanceUtils {                       // skipcq: JS-0128
      * @returns {String}
      */
     static makeCacheKey(symbol, attribute) {
-        return `${attribute}|${symbol}`;
+        return `${attribute.toUpperCase()}|${symbol.toUpperCase()}`;
+    }
+
+    static makeIgnoreSiteCacheKey(symbol, attribute) {
+        return `IGNORE|${CacheFinanceUtils.makeCacheKey(symbol, attribute)}`;
     }
 
     /**

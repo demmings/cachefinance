@@ -4,7 +4,7 @@
 export { FinanceWebSites };
 export { StockAttributes };
 export { FinanceWebSite };
-export { TdMarketResearch, GlobeAndMail, YahooFinance, FinnHub };
+export { TdMarketResearch, GlobeAndMail, YahooFinance, FinnHub, AlphaVantage, GoogleWebSiteFinance };
 
 class Logger {
     static log(msg) {
@@ -751,7 +751,7 @@ class FinnHub {
         let jsonStr = null;
         try {
             jsonStr = UrlFetchApp.fetch(URL).getContentText();
-            data = FinnHub.parseResponse(jsonStr);
+            data = FinnHub.parseResponse(jsonStr, symbol, attribute);
         }
         catch (ex) {
             return data;
