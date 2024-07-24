@@ -529,9 +529,10 @@ class CacheFinance {
 
             case "LIST":
                 return CacheFinanceUtils.convertSingleToDoubleArray(CacheFinance.listProviders());
-        }
 
-        return null;
+            default:
+                return null;
+        }
     }
 
     /**
@@ -550,7 +551,7 @@ class CacheFinance {
 
         if (typeof bestStockSites[objectKey] !== 'undefined') {
             const badSite = bestStockSites[objectKey];
-            statusMessage = "Site removed for lookups: " + badSite;
+            statusMessage = `Site removed for lookups: ${badSite}`;
             Logger.log(`Removing site from list: ${badSite}`);
             delete bestStockSites[objectKey];
             bestStockSites[CacheFinanceUtils.makeIgnoreSiteCacheKey(symbol, attribute)] = badSite;

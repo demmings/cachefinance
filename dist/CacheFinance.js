@@ -512,9 +512,10 @@ class CacheFinance {
 
             case "LIST":
                 return CacheFinanceUtils.convertSingleToDoubleArray(CacheFinance.listProviders());
-        }
 
-        return null;
+            default:
+                return null;
+        }
     }
 
     /**
@@ -533,7 +534,7 @@ class CacheFinance {
 
         if (typeof bestStockSites[objectKey] !== 'undefined') {
             const badSite = bestStockSites[objectKey];
-            statusMessage = "Site removed for lookups: " + badSite;
+            statusMessage = `Site removed for lookups: ${badSite}`;
             Logger.log(`Removing site from list: ${badSite}`);
             delete bestStockSites[objectKey];
             bestStockSites[CacheFinanceUtils.makeIgnoreSiteCacheKey(symbol, attribute)] = badSite;
@@ -1174,14 +1175,11 @@ class StockWebURL {
      * @returns 
      */
     addSiteURL(siteName, bestSite, skipSite, URL, parseResponseFunction) {
-        if (URL.trim() === '') {
+        if (URL.trim() === '' || siteName === skipSite) {
             return;
         } 
 
-        if (siteName === skipSite) {
-            return;
-        }
-        else if (siteName === bestSite) {
+        if (siteName === bestSite) {
             this.siteName.unshift(siteName);
             this.siteURL.unshift(URL);
             this.parseFunction.unshift(parseResponseFunction);
@@ -2916,6 +2914,12 @@ class CacheFinanceUtils {                       // skipcq: JS-0128
         return `${attribute.toUpperCase()}|${symbol.toUpperCase()}`;
     }
 
+    /**
+     * 
+     * @param {String} symbol 
+     * @param {String} attribute 
+     * @returns {String}
+     */
     static makeIgnoreSiteCacheKey(symbol, attribute) {
         return `IGNORE|${CacheFinanceUtils.makeCacheKey(symbol, attribute)}`;
     }

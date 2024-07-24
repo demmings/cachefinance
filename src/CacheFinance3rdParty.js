@@ -332,14 +332,11 @@ class StockWebURL {
      * @returns 
      */
     addSiteURL(siteName, bestSite, skipSite, URL, parseResponseFunction) {
-        if (URL.trim() === '') {
+        if (URL.trim() === '' || siteName === skipSite) {
             return;
         } 
 
-        if (siteName === skipSite) {
-            return;
-        }
-        else if (siteName === bestSite) {
+        if (siteName === bestSite) {
             this.siteName.unshift(siteName);
             this.siteURL.unshift(URL);
             this.parseFunction.unshift(parseResponseFunction);
