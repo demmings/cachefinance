@@ -87,9 +87,6 @@
        * "price" 
        * "yieldpct"
        * "name"
-       * "test" -  special case.  Lists in a table results of tests to third party finance sites.
-         * ```CACHEFINANCE("", "TEST")```
-       * "clearcache" - special case.  Removes **ALL** CACHEFINANCE entries in script settings.  This will force a re-test of all finance websites the next time CACHEFINANCE cannot get valid data from GOOGLEFINANCE.
       * You can specify other attributes that GOOGLEFINANCE uses, but the CacheFinance() function will not look up this data if GOOGLEFINANCE does not provide an initial default value.
       * This ATTRIBUTE name in this case is used to create our CACHE key, so its name is not important - other than when the function does a cache lookup using this key (which is made by **attribute + "|" + symbol**)
       * The following "low52" does not lookup 3'rd party website data, it will just save any value returned by GOOGLEFINANCE to cache, for the case when GOOGLEFINANCE fails to work:
@@ -98,8 +95,21 @@
     ```
     * **defaultValue** - Use GOOGLEFINANCE() to supply this value either directly or using a CELL that contains the GOOGLEFINANCE value.
       * 'yieldpct' does not work for STOCKS and ETF's in GOOGLEFINANCE, so don't supply the third parameter when using that attribute.
-    * Example: (symbol that is not recognized by GOOGLEFINANCE)
+      * Example: (symbol that is not recognized by GOOGLEFINANCE)
         *  ```=CACHEFINANCE("TSE:ZTL", "price", GOOGLEFINANCE("TSE:ZTL", "price"))```
+       *  "TEST" -  special case.  Lists in a table results of a sanity test to third party finance sites.
+            * ```=CACHEFINANCE("", "", "TEST")```
+      * "CLEARCACHE" - special case.  Removes **ALL** CACHEFINANCE entries in script settings.  This will force a re-test of all finance websites the next time CACHEFINANCE cannot get valid data from GOOGLEFINANCE.  It will also remove entries for BLOCKED sites.
+         * ```=CACHEFINANCE("", "", "CLEARCACHE")```
+         * If you specify a symbol/attribute and clearcache, the long and short term cache for this data only is removed.
+          * ```=CACHEFINANCE("TSE:CJP", "PRICE", "CLEARCACHE")```
+      * "GET", "GETBLOCKED" - special case.  Shows the preferred site (GET) and the block site (GETBLOCKED) for the symbol/attribute combo.
+      * "SET", "SETBLOCKED" - special case.  Sets the preferred site (SET) and blocked site (SETBLOCKED)
+        * ```=CACHEFINANCE("TSE:CJP", "PRICE", "SET", "YAHOO")```
+      * "LIST - special case.  Displays the ID for each web site lookup supported.
+      * "?" - special case.  Displays all supported special case commands.
+      * "REMOVE" - special case.  Takes the preferred site and moves it to the blocked site.
+        * ```=CACHEFINANCE("TSE:CJP", "PRICE", "REMOVE")```
 
 ## CACHEFINANCES
 * **WHY USE?**
