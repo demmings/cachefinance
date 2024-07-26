@@ -45,7 +45,7 @@
           * ScriptSettings.js
           * CacheFinanceUtils.js
       * None of the files in ./src are required if you use **dist/CacheFinance.js**
-    * **CacheFinanceTrigger.js** (deprecated)
+    * **CacheFinanceTrigger.js** (removed)
       * All of the functionality of **CacheFinance.js**  PLUS  use a trigger to pull your data.
 * The simple approach is to copy and paste each file.
     * From your sheets Select **Extensions** and then **Apps Script**
