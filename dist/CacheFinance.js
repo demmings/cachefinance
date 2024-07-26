@@ -1,6 +1,4 @@
 
-const GOOGLEFINANCE_PARAM_NOT_USED = "##NotSet##";
-
 //  Function only used for testing in google sheets app script.
 // skipcq: JS-0128
 function testYieldPct() {
@@ -105,53 +103,6 @@ function CACHEFINANCES(symbols, attribute = "price", defaultValues = [], webSite
  * reads from long term cache
  */
 class CacheFinance {
-    /**
-     * Replacement function to GOOGLEFINANCE for stock symbols not recognized by google.
-     * @param {string} symbol 
-     * @param {string} attribute - ["price", "yieldpct", "name"] 
-     * @param {any} googleFinanceValue - Optional.  Use GOOGLEFINANCE() to get value, if '#N/A' will read cache.
-     * @param {any} valueFromCache - optional - value previously read from cache.
-     * @returns {any}
-     */
-    static getFinanceData(symbol, attribute, googleFinanceValue, valueFromCache = null) {
-        attribute = attribute.toUpperCase().trim();
-        symbol = symbol.toUpperCase();
-        const cacheKey = CacheFinanceUtils.makeCacheKey(symbol, attribute);
-
-        //  This time GOOGLEFINANCE worked!!!
-        if (googleFinanceValue !== GOOGLEFINANCE_PARAM_NOT_USED && googleFinanceValue !== "#N/A" && googleFinanceValue !== '#ERROR!') {
-            //  We cache here longer because we would normally be getting data from Google.
-            //  If GoogleFinance is failing, we need the data to be held longer since it
-            //  it is getting from cache as an emergency backup.
-            CacheFinance.saveFinanceValueToCache(cacheKey, googleFinanceValue, 21600, valueFromCache);
-            return googleFinanceValue;
-        }
-
-        //  GOOGLEFINANCE has failed OR was not used.  Is it in the cache?
-        const shortCacheData = CacheFinance.getFinanceValueFromShortCache(cacheKey);
-        if (shortCacheData !== null) {
-            return shortCacheData;
-        }
-
-        //  Last resort... try other sites.
-        const stockAttributes = ThirdPartyFinance.get(symbol, attribute);
-
-        //  Failed third party lookup, try using long term cache.
-        if (!stockAttributes.isAttributeSet(attribute)) {
-            const longCacheData = CacheFinance.getFinanceValueFromLongCache(cacheKey);
-            if (longCacheData !== null) {
-                return longCacheData;
-            }
-        }
-        else {
-            //  If we are mostly getting this finance item from a third party, we set the timeout
-            //  a little shorter since we don't want to return extremely old data.
-            CacheFinance.saveAllFinanceValuesToCache(symbol, stockAttributes);
-        }
-
-        return stockAttributes.getValue(attribute);
-    }
-
     /**
      * 
      * @param {String[]} symbols 
@@ -306,106 +257,6 @@ class CacheFinance {
         }
 
         return null;
-    }
-
-    /**
-     * 
-     * @param {String} cacheKey 
-     * @returns {any}
-     */
-    static getFinanceValueFromLongCache(cacheKey) {
-        const longCache = new ScriptSettings();
-
-        const data = longCache.get(cacheKey);
-        if (data !== null && data !== "#ERROR!") {
-            Logger.log(`Long Term Cache.  Key=${cacheKey}. Value=${data}`);
-            //  Long cache saves and returns same data type -so no conversion needed.
-            return data;
-        }
-
-        return null;
-    }
-
-    /**
-     * 
-     * @param {String} symbol 
-     * @param {StockAttributes} stockAttributes 
-     * @returns {void}
-     */
-    static saveAllFinanceValuesToCache(symbol, stockAttributes) {
-        if (stockAttributes === null)
-            return;
-        if (stockAttributes.isAttributeSet("NAME"))
-            CacheFinance.saveFinanceValueToCache(CacheFinanceUtils.makeCacheKey(symbol, "NAME"), stockAttributes.stockName, 1200);
-        if (stockAttributes.isAttributeSet("PRICE"))
-            CacheFinance.saveFinanceValueToCache(CacheFinanceUtils.makeCacheKey(symbol, "PRICE"), stockAttributes.stockPrice, 1200);
-        if (stockAttributes.isAttributeSet("YIELDPCT"))
-            CacheFinance.saveFinanceValueToCache(CacheFinanceUtils.makeCacheKey(symbol, "YIELDPCT"), stockAttributes.yieldPct, 1200);
-    }
-
-    /**
-     * 
-     * @param {String} key 
-     * @param {any} financialData 
-     * @param {Number} shortCacheSeconds 
-     * @param {any} currentShortCacheValue
-     * @returns {void}
-     */
-    static saveFinanceValueToCache(key, financialData, shortCacheSeconds = 1200, currentShortCacheValue = null) {
-        const shortCache = CacheService.getScriptCache();
-        if (currentShortCacheValue === null) {
-            currentShortCacheValue = shortCache.get(key);
-        }
-        const longCacheDays = 7;
-
-        if (!CacheFinance.isTimeToUpdateCache(currentShortCacheValue, financialData)) {
-            return;
-        }
-
-        //  If we normally get the price from Google, we want to cache for a longer
-        //  time because the only time we need a price for this particular stock
-        //  is when GOOGLEFINANCE fails.
-        let start = new Date().getTime();
-        shortCache.put(key, JSON.stringify(financialData), shortCacheSeconds);
-        const shortMs = new Date().getTime() - start;
-
-        //  For emergency cases when GOOGLEFINANCE is down long term...
-        start = new Date().getTime();
-        const longCache = new ScriptSettings();
-        longCache.put(key, financialData, longCacheDays);
-        const longMs = new Date().getTime() - start;
-
-        Logger.log(`SET GoogleFinance VALUE Long/Short Cache. Key=${key}.  Value=${financialData}. Short ms=${shortMs}. Long ms=${longMs}`);
-    }
-
-    /**
-     * 
-     * @param {String} currentShortCacheValue 
-     * @param {any} financialData 
-     * @returns {Boolean}
-     */
-    static isTimeToUpdateCache(currentShortCacheValue, financialData) {
-        if (currentShortCacheValue === null)
-            return true;
-
-        const oldData = JSON.parse(currentShortCacheValue);
-        if (oldData === financialData) {
-            Logger.log("GoogleFinance VALUE.  No Change in SHORT Cache.");
-            return false;
-        }
-
-        if (oldData > 0 && financialData > 0) {
-            const changeInPrice = oldData - financialData;
-            const percentChange = Math.abs(changeInPrice / oldData);
-            if (percentChange < 0.0025) {
-                Logger.log(`Short Cache Changed very little.  Old=${oldData} . New=${financialData}`);
-                return false;
-            }
-        }
-
-        Logger.log(`Short Cache Changed.  Old=${oldData} . New=${financialData}`);
-
-        return true;
     }
 
     /**
