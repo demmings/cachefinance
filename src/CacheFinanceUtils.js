@@ -41,6 +41,7 @@ class CacheFinanceUtils {                       // skipcq: JS-0128
      * @param {any[]} symbols 
      * @param {String} attribute 
      * @param {any[]} newCacheData 
+     * @param {Number} cacheSeconds
      */
     static bulkShortCachePut(symbols, attribute, newCacheData, cacheSeconds) {
         if (symbols.length === 0 || newCacheData.length === 0) {
@@ -121,15 +122,19 @@ class CacheFinanceUtils {                       // skipcq: JS-0128
      */
     static putFinanceValuesIntoShortCache(cacheKeys, newCacheData, cacheSeconds = 21600) {
         const bulkData = {};
+        let updateCounter = 0;
 
         for (let i = 0; i < cacheKeys.length; i++) {
             if (CacheFinanceUtils.isValidGoogleValue(newCacheData[i])) {
                 bulkData[cacheKeys[i]] = JSON.stringify(newCacheData[i]);
+                updateCounter++;
             }
         }
 
-        const shortCache = CacheService.getScriptCache();
-        shortCache.putAll(bulkData, cacheSeconds);
+        if (updateCounter > 0) {
+            const shortCache = CacheService.getScriptCache();
+            shortCache.putAll(bulkData, cacheSeconds);
+        }
     }
 
     /**

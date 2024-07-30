@@ -7,7 +7,7 @@ import { cacheFinanceTest } from "./CacheFinanceTest.js";
 import { StockAttributes, FinanceWebSites } from "./CacheFinanceWebSites.js";
 import { CacheService, SpreadsheetApp } from "./GasMocks.js";
 import { CacheFinanceUtils } from "./CacheFinanceUtils.js";
-export { CACHEFINANCE, CacheFinance, GOOGLEFINANCE_PARAM_NOT_USED };
+export { CACHEFINANCE, CacheFinance };
 
 class Logger {
     static log(msg) {
@@ -94,21 +94,12 @@ function CACHEFINANCES(symbols, attribute = "price", defaultValues = [], webSite
     const newValues = CacheFinanceUtils.convertRowsToSingleArray(trimmedValues);
 
     attribute = attribute.toUpperCase().trim();
-    if (attribute === "CLEARCACHE") {
-        ScriptSettings.expire(true);
-        return 'Long Cache Cleared';
-    }
-
-    if (typeof newValues === 'string' && newValues.toUpperCase() === 'CLEARCACHE') {
-        CacheFinanceUtils.bulkShortCacheRemoveAll(newSymbols, attribute);
-        return 'Short Cache Cleared';
-    }
 
     if (newSymbols.length === 0 || attribute === '') {
         return '';
     }
 
-    Logger.log(`CacheFinances START.  Attribute=${attribute} symbols=${symbols.length}`);
+    Logger.log(`CacheFinances START.  Attribute=${attribute} symbols=${symbols.length} websiteLookupSeconds=${webSiteLookupCacheSeconds}`);
 
     return CacheFinance.getBulkFinanceData(newSymbols, attribute, newValues, webSiteLookupCacheSeconds);
 }
@@ -144,11 +135,11 @@ class CacheFinance {
         //  Make requests (very slow) from financial web sites to find missing data.
         const thirdPartyStockAtributes = ThirdPartyFinance.getMissingStockAttributesFromThirdParty(symbolsWithNoData, attribute);
         const thirdPartyFinanceValues = CacheFinance.getValuesFromStockAttributes(thirdPartyStockAtributes, attribute);
-        googleFinanceValues = CacheFinance.updateMasterWithMissed(symbols, googleFinanceValues, symbolsWithNoData, thirdPartyFinanceValues);
-
         //  All data found in websites (not GOOGLEFINANCE) is placed in cache (for a shorter period of time than those from GOOGLEFINANCE)
         const cacheSeconds = webSiteLookupCacheSeconds === -1 ? MAX_SHORT_CACHE_THIRD_PARTY : webSiteLookupCacheSeconds;
-        CacheFinance.putAllStockAttributeDataIntoShortCache(thirdPartyStockAtributes, symbolsWithNoData, cacheSeconds);
+        CacheFinanceUtils.bulkShortCachePut(symbolsWithNoData, attribute, thirdPartyFinanceValues, cacheSeconds);
+
+        googleFinanceValues = CacheFinance.updateMasterWithMissed(symbols, googleFinanceValues, symbolsWithNoData, thirdPartyFinanceValues);
 
         // Last, last resort.  Try to find in LONG CACHE.  This could be DAYS old, but it is better than invalid data.
         const lastResortMissingStocks = CacheFinance.getSymbolsWithNoValidData(symbols, googleFinanceValues);
@@ -176,22 +167,6 @@ class CacheFinance {
 
     /**
      * 
-     * @param {StockAttributes[]} thirdPartyStockAtributes 
-     * @param {String[]} symbolsWithNoData 
-     * @param {Number} cacheSeconds 
-     */
-    static putAllStockAttributeDataIntoShortCache(thirdPartyStockAtributes, symbolsWithNoData, cacheSeconds) {
-        const thirdPartyPriceValues = CacheFinance.getValuesFromStockAttributes(thirdPartyStockAtributes, "PRICE");
-        const thirdPartyNameValues = CacheFinance.getValuesFromStockAttributes(thirdPartyStockAtributes, "NAME");
-        const thirdPartyYieldValues = CacheFinance.getValuesFromStockAttributes(thirdPartyStockAtributes, "YIELDPCT");
-
-        CacheFinanceUtils.bulkShortCachePut(symbolsWithNoData, "PRICE", thirdPartyPriceValues, cacheSeconds);
-        CacheFinanceUtils.bulkShortCachePut(symbolsWithNoData, "NAME", thirdPartyNameValues, cacheSeconds);
-        CacheFinanceUtils.bulkShortCachePut(symbolsWithNoData, "YIELDPCT", thirdPartyYieldValues, cacheSeconds);
-    }
-
-    /**
-     * 
      * @param {String[]} symbols 
      * @param {String} attribute 
      * @param {any[]} googleFinanceValues 
@@ -204,8 +179,13 @@ class CacheFinance {
         }
 
         const valueFromCache = CacheFinanceUtils.bulkShortCacheGet(symbols, attribute).map(val => val === null ? "#N/A" : val);
-
-        return googleFinanceValues.map((val, i) => CacheFinanceUtils.isValidGoogleValue(val) ? val : valueFromCache[i]);
+        const updatedValues = [];
+        for (let i = 0; i < symbols.length; i++) {
+            const val = CacheFinanceUtils.isValidGoogleValue(googleFinanceValues[i]) ? googleFinanceValues[i] : valueFromCache[i];
+            updatedValues.push(val);
+        }
+        
+        return updatedValues;
     }
 
     /**
