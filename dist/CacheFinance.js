@@ -2544,8 +2544,7 @@ class GoogleWebSiteFinance {
     static extractStockPrice(html, symbol) {
         let data = null;
         //  skipcq: JS-0097
-        const priceMatch = html.match(/data-last-price="(\d{0,4}\.?\d{0,4})"/);
-
+        const priceMatch = html.match(/data-last-price="([0-9]*\.*[0-9]*)"/);
         if (priceMatch !== null && priceMatch.length > 1) {
             const tempPrice = priceMatch[1];
             Logger.log(`Google. Stock=${symbol}.PRICE=${tempPrice}`);
