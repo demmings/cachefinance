@@ -57,8 +57,11 @@ function CACHEFINANCE(symbol, attribute = "price", googleFinanceValue = "", cmdO
  * @customfunction
  */
 function CACHEFINANCES(symbols, attribute = "price", defaultValues = [], webSiteLookupCacheSeconds = -1) {         // skipcq: JS-0128
-    if (!Array.isArray(symbols)) {
-        throw new Error("Expecting list of stock symbols.");
+    let isSingleLookup =  false;
+    if (!Array.isArray(symbols) && !Array.isArray(defaultValues) ) {
+        isSingleLookup =  true;
+        symbols = [[symbols]];
+        defaultValues = [[defaultValues]];
     }
 
     if (Array.isArray(symbols) && Array.isArray(defaultValues) && defaultValues.length > 0 && symbols.length !== defaultValues.length) {
@@ -84,7 +87,12 @@ function CACHEFINANCES(symbols, attribute = "price", defaultValues = [], webSite
 
     Logger.log(`CacheFinances START.  Attribute=${attribute} symbols=${symbols.length} websiteLookupSeconds=${webSiteLookupCacheSeconds}`);
 
-    return CacheFinance.getBulkFinanceData(newSymbols, attribute, newValues, webSiteLookupCacheSeconds);
+    let financeValues = CacheFinance.getBulkFinanceData(newSymbols, attribute, newValues, webSiteLookupCacheSeconds);
+    if (isSingleLookup) {
+        financeValues = financeValues[0][0];
+    }
+    
+    return financeValues;
 }
 
 /**
@@ -1330,6 +1338,7 @@ class CacheFinanceTest {
 
         this.cacheTestRun.run("Finnhub", FinnHub.getInfo, "NYSEARCA:VOO", "PRICE");
         this.cacheTestRun.run("AlphaVantage", AlphaVantage.getInfo, "NYSEARCA:VOO", "PRICE");
+        this.cacheTestRun.run("AlphaVantage", AlphaVantage.getInfo, "CURRENCY:USDEUR", "PRICE");
 
         return this.cacheTestRun.getTestRunResults();
     }
@@ -1603,6 +1612,7 @@ class FinanceWebSites {
             case "NYSEAMERICAN":
             case "OPRA":
             case "OTCMKTS":
+            case "CURRENCY":
                 countryCode = "us";
                 break;
             case "CVE":
@@ -1707,6 +1717,12 @@ class StockAttributes {
     set stockPrice(value) {
         if (value !== null) {
             this._stockPrice = Math.round(value * 100) / 100;
+        }
+    }
+
+    set exchangeRate(value) {
+        if (value !== null) {
+            this._stockPrice = Math.round(value * 10000) / 10000;
         }
     }
 
@@ -2363,8 +2379,9 @@ class AlphaVantage {
             return data;
         }
 
-        const URL = AlphaVantage.getURL(symbol, attribute, AlphaVantage.getApiKey());
-        Logger.log(`getInfo:  ${symbol}.  URL = ${URL}`);
+        const apiKey = AlphaVantage.getApiKey();
+        const URL = AlphaVantage.getURL(symbol, attribute, apiKey);
+        Logger.log(`getInfo: AlphaVantage  ${symbol}.  URL = ${URL}.  Key = ${apiKey}`);
 
         let jsonStr = null;
         try {
@@ -2398,8 +2415,17 @@ class AlphaVantage {
         if (countryCode !== "us") {
             return "";
         }
+        const symbolParts = symbol.split(":");
 
-        return `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${FinanceWebSites.getBaseTicker(symbol)}&apikey=${API_KEY}`;
+        if (symbolParts[0] === "CURRENCY") {
+            const fromCurrency = symbolParts[1].substring(0, 3);
+            const toCurrency = symbolParts[1].substring(3, 6);
+
+            return `https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=${fromCurrency}&to_currency=${toCurrency}&apikey=${API_KEY}`;
+        }
+        else {
+            return `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${FinanceWebSites.getBaseTicker(symbol)}&apikey=${API_KEY}`;
+        }
     }
 
     /**
@@ -2417,6 +2443,7 @@ class AlphaVantage {
      */
     static parseResponse(jsonStr) {
         const data = new StockAttributes();
+        let failed = false;
 
         Logger.log(`content=${jsonStr}`);
         try {
@@ -2425,7 +2452,20 @@ class AlphaVantage {
             Logger.log(`Price=${data.stockPrice}`);
         }
         catch (ex) {
-            Logger.log("AlphaVantage JSON Parse Error.");
+            Logger.log("AlphaVantage JSON Parse Error (looking for price).");
+            failed = true;
+        }
+
+        if (failed) {
+            try {
+                const alphaVantageData = JSON.parse(jsonStr);
+                data.exchangeRate = alphaVantageData["Realtime Currency Exchange Rate"]["5. Exchange Rate"];
+                Logger.log(`Price=${data.stockPrice}`);
+            }
+            catch (ex) {
+                Logger.log("AlphaVantage JSON Parse Error (looking for currency).");
+            }
+
         }
 
         return data;

@@ -74,8 +74,11 @@ function CACHEFINANCE(symbol, attribute = "price", googleFinanceValue = "", cmdO
  * @customfunction
  */
 function CACHEFINANCES(symbols, attribute = "price", defaultValues = [], webSiteLookupCacheSeconds = -1) {         // skipcq: JS-0128
-    if (!Array.isArray(symbols)) {
-        throw new Error("Expecting list of stock symbols.");
+    let isSingleLookup =  false;
+    if (!Array.isArray(symbols) && !Array.isArray(defaultValues) ) {
+        isSingleLookup =  true;
+        symbols = [[symbols]];
+        defaultValues = [[defaultValues]];
     }
 
     if (Array.isArray(symbols) && Array.isArray(defaultValues) && defaultValues.length > 0 && symbols.length !== defaultValues.length) {
@@ -101,7 +104,12 @@ function CACHEFINANCES(symbols, attribute = "price", defaultValues = [], webSite
 
     Logger.log(`CacheFinances START.  Attribute=${attribute} symbols=${symbols.length} websiteLookupSeconds=${webSiteLookupCacheSeconds}`);
 
-    return CacheFinance.getBulkFinanceData(newSymbols, attribute, newValues, webSiteLookupCacheSeconds);
+    let financeValues = CacheFinance.getBulkFinanceData(newSymbols, attribute, newValues, webSiteLookupCacheSeconds);
+    if (isSingleLookup) {
+        financeValues = financeValues[0][0];
+    }
+    
+    return financeValues;
 }
 
 /**

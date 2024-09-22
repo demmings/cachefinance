@@ -53,6 +53,7 @@ class CacheFinanceTest {
 
         this.cacheTestRun.run("Finnhub", FinnHub.getInfo, "NYSEARCA:VOO", "PRICE");
         this.cacheTestRun.run("AlphaVantage", AlphaVantage.getInfo, "NYSEARCA:VOO", "PRICE");
+        this.cacheTestRun.run("AlphaVantage", AlphaVantage.getInfo, "CURRENCY:USDEUR", "PRICE");
 
         return this.cacheTestRun.getTestRunResults();
     }
