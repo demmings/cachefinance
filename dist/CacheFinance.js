@@ -1721,9 +1721,14 @@ class StockAttributes {
     }
 
     set exchangeRate(value) {
+        //  We need 4 decimal places for currency, so setting stockPrice was 
+        //  rounding to 2 places - so we have a 'special' price setter for exchange rates.
         if (value !== null) {
             this._stockPrice = Math.round(value * 10000) / 10000;
         }
+    }
+    get exchangeRate() {
+        return this._stockPrice;     
     }
 
     get stockName() {
