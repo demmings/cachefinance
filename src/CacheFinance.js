@@ -93,9 +93,10 @@ function CACHEFINANCES(symbols, attribute = "price", defaultValues = [], webSite
     const trimmedValues = CacheFinanceUtils.removeEmptyRecordsAtEndOfTable(defaultValues);
 
     //  Data ranges from sheets are double arrays.  Just make life simple and convert to single array.
-    const newSymbols = CacheFinanceUtils.convertRowsToSingleArray(trimmedSymbols);
+    let newSymbols = CacheFinanceUtils.convertRowsToSingleArray(trimmedSymbols);
     const newValues = CacheFinanceUtils.convertRowsToSingleArray(trimmedValues);
 
+    newSymbols = newSymbols.map(sym => sym.toUpperCase());
     attribute = attribute.toUpperCase().trim();
 
     if (newSymbols.length === 0 || attribute === '') {

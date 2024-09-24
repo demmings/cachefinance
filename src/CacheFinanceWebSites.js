@@ -30,8 +30,8 @@ class FinanceWebSites {
             new FinanceWebSite("TDStock", TdMarketsStock),
             new FinanceWebSite("Globe", GlobeAndMail),
             new FinanceWebSite("Yahoo", YahooFinance),
-            new FinanceWebSite("AlphaVantage", AlphaVantage),
-            new FinanceWebSite("GoogleWebSiteFinance", GoogleWebSiteFinance)
+            new FinanceWebSite("GoogleWebSiteFinance", GoogleWebSiteFinance),
+            new FinanceWebSite("AlphaVantage", AlphaVantage)
         ];
 
         /** @property {Map<String, FinanceWebSite>} */
@@ -81,7 +81,6 @@ class FinanceWebSites {
             case "NYSEAMERICAN":
             case "OPRA":
             case "OTCMKTS":
-            case "CURRENCY":
                 countryCode = "us";
                 break;
             case "CVE":
@@ -92,6 +91,9 @@ class FinanceWebSites {
                 break;
             case "SGX":
                 countryCode = "sg";
+                break;
+            case "CURRENCY":
+                countryCode = "fx";
                 break;
             default:
                 countryCode = "ca";     //  We the north!
@@ -197,7 +199,7 @@ class StockAttributes {
         }
     }
     get exchangeRate() {
-        return this._stockPrice;     
+        return this._stockPrice;
     }
 
     get stockName() {
@@ -389,7 +391,12 @@ class TdMarketResearch {
      * @returns {String}
      */
     static getURL(symbol, type = "ETF") {
-        let URL = null;
+        let URL = "";
+
+        if (FinanceWebSites.getTickerCountryCode(symbol) === "fx") {
+            return URL;
+        }
+
         if (type === "ETF")
             URL = `https://marketsandresearch.td.com/tdwca/Public/ETFsProfile/Summary/${FinanceWebSites.getTickerCountryCode(symbol)}/${TdMarketResearch.getTicker(symbol)}`;
         else
@@ -470,10 +477,11 @@ class YahooFinance {
     /**
      * 
      * @param {String} symbol 
+     * @param {String} attribute
      * @returns {StockAttributes}
      */
-    static getInfo(symbol) {
-        const URL = YahooFinance.getURL(symbol);
+    static getInfo(symbol, attribute) {
+        const URL = YahooFinance.getURL(symbol, attribute);
 
         let html = null;
         try {
@@ -495,6 +503,10 @@ class YahooFinance {
      * @returns {String}
      */
     static getURL(symbol, _attribute) {
+        if (FinanceWebSites.getTickerCountryCode(symbol) === "fx") {
+            return "";
+        }
+
         return `https://finance.yahoo.com/quote/${YahooFinance.getTicker(symbol)}`;
     }
 
@@ -602,10 +614,11 @@ class GlobeAndMail {
     /**
      * Only gets dividend yield.
      * @param {String} symbol 
+     * @param {String} attribute
      * @returns {StockAttributes}
      */
-    static getInfo(symbol) {
-        const URL = GlobeAndMail.getURL(symbol);
+    static getInfo(symbol, attribute) {
+        const URL = GlobeAndMail.getURL(symbol, attribute);
 
         Logger.log(`getInfo:  ${symbol}.  URL = ${URL}`);
 
@@ -627,6 +640,10 @@ class GlobeAndMail {
      * @returns {String}
      */
     static getURL(symbol, _attribute) {
+        if (FinanceWebSites.getTickerCountryCode(symbol) === "fx") {
+            return "";
+        }
+
         return `https://www.theglobeandmail.com/investing/markets/stocks/${GlobeAndMail.getTicker(symbol)}`;
     }
 
@@ -848,7 +865,7 @@ class AlphaVantage {
         }
 
         const countryCode = FinanceWebSites.getTickerCountryCode(symbol);
-        if (countryCode !== "us") {
+        if (!(countryCode === "us" || countryCode === "fx")) {
             Logger.log(`AlphaVantage --> Only U.S. stocks: ${symbol}`);
             return data;
         }
@@ -886,12 +903,12 @@ class AlphaVantage {
         }
 
         const countryCode = FinanceWebSites.getTickerCountryCode(symbol);
-        if (countryCode !== "us") {
+        if (! (countryCode === "us" || countryCode === "fx")) {
             return "";
         }
         const symbolParts = symbol.split(":");
 
-        if (symbolParts[0] === "CURRENCY") {
+        if (countryCode === "fx") {
             const fromCurrency = symbolParts[1].substring(0, 3);
             const toCurrency = symbolParts[1].substring(3, 6);
 
@@ -966,8 +983,8 @@ class GoogleWebSiteFinance {
      * @param {String} symbol 
      * @returns {StockAttributes}
      */
-    static getInfo(symbol) {
-        const URL = GoogleWebSiteFinance.getURL(symbol);
+    static getInfo(symbol, attribute) {
+        const URL = GoogleWebSiteFinance.getURL(symbol, attribute);
 
         let html = null;
         try {
@@ -1019,8 +1036,13 @@ class GoogleWebSiteFinance {
         }
 
         data.yieldPct = GoogleWebSiteFinance.extractYieldPct(html, symbol);
-        data.stockPrice = GoogleWebSiteFinance.extractStockPrice(html, symbol);
         data.stockName = GoogleWebSiteFinance.extractStockName(html, symbol);
+        if (FinanceWebSites.getTickerCountryCode(symbol) === "fx") {
+            data.exchangeRate = GoogleWebSiteFinance.extractStockPrice(html, symbol);
+        }
+        else {
+            data.stockPrice = GoogleWebSiteFinance.extractStockPrice(html, symbol);
+        }
 
         return data;
     }
@@ -1121,7 +1143,14 @@ class GoogleWebSiteFinance {
         if (colon >= 0) {
             const symbolParts = symbol.split(":");
 
-            modifiedSymbol = `${symbolParts[1]}:${symbolParts[0]}`;
+            if (FinanceWebSites.getTickerCountryCode(symbol) !== "fx") {
+                modifiedSymbol = `${symbolParts[1]}:${symbolParts[0]}`;
+            }
+            else {
+                const fromCurrency = symbolParts[1].substring(0, 3);
+                const toCurrency = symbolParts[1].substring(3, 6);
+                modifiedSymbol = `${fromCurrency}-${toCurrency}?hl=en`;
+            }
         }
         return modifiedSymbol;
     }
