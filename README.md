@@ -217,7 +217,7 @@
   * You should call each individual step that would be used so we can be sure all parts are working.
   * Parameters are:
     * **symbol** - expect the symbol as it would be formed for a google finance lookup.  i.e. the exchange and ticker symbol may be in a different format than what is expected at your web site.
-    * **attribute** - a goole attribute like "price", "name", "yileldpct"
+    * **attribute** - a goole attribute like "price", "name", "yieldpct"
   * Example for Globe and Mail website calling required method.
 
 ```
@@ -255,7 +255,7 @@
   * Creates a string that will be used to do the UrlFetchApp.fetch()   
   * Parameters are:
     * **symbol** - expect the symbol as it would be formed for a google finance lookup.  i.e. the exchange and ticker symbol may be in a different format than what is expected at your web site.
-    * **_attribute** - a goole attribute like "price", "name", "yileldpct"
+    * **_attribute** - a goole attribute like "price", "name", "yieldpct"
       * If the URL formatting depends on knowning the attribute you can use it.  Otherwise ignore.
     * **API_KEY** - The results from getApiKey() will be passed here.
       * Some web sites require your personal API KEY to be included in the URL.
@@ -279,7 +279,7 @@
     }
 ```
   * FinanceWebSites.getTickerCountryCode(symbol) - this function will return the country code.
-  * It is not necessary to call this function, it is used only if you need to know the country because it is either not supported or different URL formatting is needed.   
+  * It is not necessary to call FinanceWebSites.getTickerCountryCode(), it is used only if you need to know the country because it is either not supported or different URL formatting is needed.   
 
 ***
 * # **getApiKey()**
