@@ -212,7 +212,10 @@ class CacheFinanceUtils {                       // skipcq: JS-0128
     }
 }
 
-class SiteThrottle {
+/**
+ * @classdesc Used for tracking throttle use limits for a stock site.
+ */
+class SiteThrottle {            // skipcq:  JS-0128
     /**
      * @param {String} siteID
      * @param {ThresholdPeriod[]} thresholds 
@@ -335,7 +338,7 @@ class SiteThrottle {
      */
     static currentForSecond(key) {
         const shortCache = CacheService.getScriptCache();
-        let data = shortCache.get(key);
+        const data = shortCache.get(key);
 
         return data === null ? 0 : JSON.parse(data);            
     }
@@ -347,7 +350,7 @@ class SiteThrottle {
      */
     static currentForMinute(key) {
         const shortCache = CacheService.getScriptCache();
-        let data = shortCache.get(key);
+        const data = shortCache.get(key);
 
         return data === null ? 0 : JSON.parse(data);
     }
@@ -388,7 +391,7 @@ class SiteThrottle {
      */
     static currentForDay(key) {
         const longCache = new ScriptSettings();
-        let data = longCache.get(key);
+        const data = longCache.get(key);
 
         return data === null ? 0 : data;
     }
@@ -440,7 +443,11 @@ class SiteThrottle {
     }
 }
 
-class ThresholdPeriod {
+
+/**
+ * @classdesc Used to define a throttle limit.
+ */
+class ThresholdPeriod {         // skipcq:  JS-0128
     constructor(periodName, maxPerPeriod) {
         this._periodName = periodName;
         this._maxPerPeriod = maxPerPeriod;

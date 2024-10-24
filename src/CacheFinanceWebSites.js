@@ -1123,10 +1123,10 @@ class GoogleWebSiteFinance {
     /**
      * 
      * @param {String} html 
-     * @param {String} symbol 
+     * @param {String} _symbol 
      * @returns {Number}
      */
-    static extractYieldPct(html, symbol) {
+    static extractYieldPct(html, _symbol) {
         let data = null;
         //  skipcq: JS-0097
         const dividendPercent = html.match(/Dividend yield.+?(\d{0,4}\.?\d{0,4})%<\/div>/);
@@ -1146,10 +1146,10 @@ class GoogleWebSiteFinance {
     /**
      * 
      * @param {String} html 
-     * @param {String} symbol 
+     * @param {String} _symbol 
      * @returns {Number}
      */
-    static extractStockPrice(html, symbol) {
+    static extractStockPrice(html, _symbol) {
         let data = null;
         //  skipcq: JS-0097
         const priceMatch = html.match(/data-last-price="(\d{0,7}\.*\d{0,20})"/);
@@ -1332,15 +1332,15 @@ class TwelveData {
 
         try {
             if (attribute === "NAME") {
-                data.stockName = twelveData["name"];
+                data.stockName = twelveData.name;
                 Logger.log(`TwelveData. Name=${data.stockName}`);
             }
             else if (attribute === "PRICE") {
                 if (countryCode === "fx") {
-                    data.exchangeRate = twelveData["close"];
+                    data.exchangeRate = twelveData.close;
                 }
                 else {
-                    data.stockPrice = twelveData["close"];
+                    data.stockPrice = twelveData.close;
                 }
                 Logger.log(`TwelveData. Price=${data.stockPrice}`);
             }
