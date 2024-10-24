@@ -259,6 +259,11 @@ class SiteThrottle {            // skipcq:  JS-0128
         return inLimit;
     }
 
+    /**
+     * @param {ThresholdPeriod[]} thresholds 
+     * @param {String} siteID 
+     * @returns {[String[], Number[]]}
+     */
     static getCurrentThresholds(thresholds, siteID) {
         let key = "";
         let current = 0;
