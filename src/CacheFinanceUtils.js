@@ -1,8 +1,8 @@
 /*  *** DEBUG START ***
 //  Remove comments for testing in NODE
 
-import { ScriptSettings, PropertyData } from "./SQL/ScriptSettings.js";
-export { CacheFinanceUtils };
+import { ScriptSettings } from "./SQL/ScriptSettings.js";
+export { CacheFinanceUtils, SiteThrottle, ThresholdPeriod };
 
 class Logger {
     static log(msg) {
@@ -209,5 +209,253 @@ class CacheFinanceUtils {                       // skipcq: JS-0128
      */
     static convertSingleToDoubleArray(singleArray) {
         return singleArray.map(item => [item]);
+    }
+}
+
+class SiteThrottle {
+    /**
+     * @param {String} siteID
+     * @param {ThresholdPeriod[]} thresholds 
+     */
+    constructor(siteID, thresholds) {
+        this.siteID = siteID;
+        this.thresholds = thresholds;
+        this.periodKeys = [];
+        this.periodCount = [];
+    }
+
+    /**
+     * @returns {Boolean} - true is ok to make request
+     */
+    checkAndIncrement() {
+        let inLimit = true;
+
+        //  If this is the first time called, we must do the time intensive read from cache
+        //  to get the current api call count for each period we have limits for.
+        if (this.periodKeys.length === 0) {
+            [this.periodKeys, this.periodCount] = SiteThrottle.getCurrentThresholds(this.thresholds, this.siteID);
+        }
+
+        //  Will we exceed any thresholds?
+        for (let i = 0; i < this.thresholds.length; i++) {
+            inLimit = this.periodCount[i] + 1 < this.thresholds[i].maxPerPeriod;
+
+            if (!inLimit) {
+                Logger.log(`Throttle Limit EXCEEDED. ${this.siteID}`);
+                break;
+            }
+        }
+
+        //  If we don't exceed the throttle limits, increment all threshold counters.
+        if (inLimit) {
+            for (let i = 0; i < this.periodCount.length; i++) {
+                this.periodCount[i]++;
+            }
+        }
+
+        return inLimit;
+    }
+
+    static getCurrentThresholds(thresholds, siteID) {
+        let key = "";
+        let current = 0;
+        const keys = [];
+        const limits = [];
+
+        for (const period of thresholds) {
+            switch (period.periodName) {
+                case "SECOND":
+                    key = SiteThrottle.createSecondKey(siteID);
+                    current = SiteThrottle.currentForSecond(key);
+                    Logger.log(`SECOND Check.  key=${key}. Current=${current.toString()}.`);
+                    break;
+
+                case "MINUTE":
+                    key = SiteThrottle.createMinuteKey(siteID);
+                    current = SiteThrottle.currentForMinute(key);
+                    Logger.log(`MINUTE Check.  key=${key}. Current=${current.toString()}.`);
+                    break;
+
+                case "DAY":
+                    key = SiteThrottle.createDayKey(siteID);
+                    current = SiteThrottle.currentForDay(key);
+                    Logger.log(`DAY Check.  key=${key}. Current=${current.toString()}.`);
+
+                    break;
+
+                default:
+                    throw new Error(`Invalid threshold period ${period.periodName}`);
+            }
+
+            //  We save the KEY because it may change before we increment.
+            //  We save the current value because re-reading is very time consuming.
+            keys.push(key);
+            limits.push(current);
+        }
+
+        return [keys, limits];
+    }
+
+    //  At the end of a batch URL fetch, the THROTTLE stats need to be 
+    //  saved to cache.
+    update() {
+        if (this.periodKeys.length === 0) {
+            //  Was never used for this site.
+            return;
+        }
+
+        for (let i = 0; i < this.thresholds.length; i++) {
+            const period = this.thresholds[i];
+            switch (period.periodName) {
+                case "SECOND":
+                    SiteThrottle.updateForSecond(this.periodKeys[i], this.periodCount[i]);
+                    break;
+
+                case "MINUTE":
+                    SiteThrottle.updateForMinute(this.periodKeys[i], this.periodCount[i]);
+                    break;
+
+                case "DAY":
+                    SiteThrottle.updateForDay(this.periodKeys[i], this.periodCount[i]);
+                    break;
+
+                default:
+                    throw new Error(`Invalid threshold period ${period.periodName}`);
+            }
+        }
+
+        this.periodKeys = [];
+        this.periodCount = [];
+    }
+
+    /**
+     * 
+     * @param {String} key 
+     * @returns {Number}
+     */
+    static currentForSecond(key) {
+        const shortCache = CacheService.getScriptCache();
+        let data = shortCache.get(key);
+
+        return data === null ? 0 : JSON.parse(data);            
+    }
+
+    /**
+     * Current number of requests in THIS minute.  
+     * @param {String} key
+     * @returns {Number}
+     */
+    static currentForMinute(key) {
+        const shortCache = CacheService.getScriptCache();
+        let data = shortCache.get(key);
+
+        return data === null ? 0 : JSON.parse(data);
+    }
+
+    /**
+     * 
+     * @param {String} key 
+     * @param {Number} current 
+     */
+    static updateForSecond(key, current) {
+        const shortCache = CacheService.getScriptCache();
+        shortCache.put(key, JSON.stringify(current), 10);        
+    }
+
+    /**
+     * Add to minute counter.
+     * @param {String} key 
+     * @param {Number} current 
+     */
+    static updateForMinute(key, current) {
+        const shortCache = CacheService.getScriptCache();
+        shortCache.put(key, JSON.stringify(current), 180);
+    }
+
+    /**
+     * @param {String} key 
+     * @param {Number} current 
+     */
+    static updateForDay(key, current) {
+        const longCache = new ScriptSettings();
+        longCache.put(key, current, 2);
+    }
+
+    /**
+     * Current requests made for the day.
+     * @param {String} key 
+     * @returns {Number}
+     */
+    static currentForDay(key) {
+        const longCache = new ScriptSettings();
+        let data = longCache.get(key);
+
+        return data === null ? 0 : data;
+    }
+
+    /**
+     * 
+     * @param {String} siteID 
+     * @param {String} intervalName 
+     * @param {any} periodNumber - (0-59 -> MINUTE), (0-6 -> DAY) 
+     * @returns 
+     */
+    static makeKey(siteID, intervalName, periodNumber) {
+        return `${siteID}:${intervalName}:${periodNumber.toString()}`;
+    }
+
+    /**
+     * 
+     * @param {String} siteID 
+     * @returns {String}
+     */
+    static createSecondKey(siteID) {
+        const today = new Date();
+        const second = today.getSeconds();
+
+        return SiteThrottle.makeKey(siteID, "SEC", second);        
+    }
+
+    /**
+     * 
+     * @param {String} siteID 
+     * @returns {String}
+     */
+    static createMinuteKey(siteID) {
+        const today = new Date();
+        const minute = today.getMinutes();
+
+        return SiteThrottle.makeKey(siteID, "MIN", minute);
+    }
+
+    /**
+     * 
+     * @param {String} siteID 
+     * @returns {String}
+     */
+    static createDayKey(siteID) {
+        const today = new Date();
+        const dayNum = today.getDay();      // Day of the week. 0-6
+        return SiteThrottle.makeKey(siteID, "DAY", dayNum);
+    }
+}
+
+class ThresholdPeriod {
+    constructor(periodName, maxPerPeriod) {
+        this._periodName = periodName;
+        this._maxPerPeriod = maxPerPeriod;
+    }
+
+    get periodName() {
+        return this._periodName;
+    }
+    set periodName(val) {
+        this._periodName = val;
+    }
+    get maxPerPeriod() {
+        return this._maxPerPeriod;
+    }
+    set maxPerPeriod(val) {
+        this._maxPerPeriod = val;
     }
 }

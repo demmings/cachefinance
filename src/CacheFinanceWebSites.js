@@ -1,10 +1,11 @@
 /*  *** DEBUG START ***
 //  Remove comments for testing in NODE
 
+import { SiteThrottle, ThresholdPeriod } from "./CacheFinanceUtils.js";
 export { FinanceWebSites };
 export { StockAttributes };
 export { FinanceWebSite };
-export { TdMarketResearch, GlobeAndMail, YahooFinance, FinnHub, AlphaVantage, GoogleWebSiteFinance };
+export { TdMarketResearch, GlobeAndMail, YahooFinance, FinnHub, AlphaVantage, GoogleWebSiteFinance, TwelveData };
 
 class Logger {
     static log(msg) {
@@ -25,12 +26,13 @@ class FinanceWebSites {
      */
     constructor() {
         this.siteList = [
-            new FinanceWebSite("FinnHub", FinnHub),
+            new FinanceWebSite("GoogleWebSiteFinance", GoogleWebSiteFinance),
             new FinanceWebSite("TDEtf", TdMarketsEtf),
             new FinanceWebSite("TDStock", TdMarketsStock),
+            new FinanceWebSite("FinnHub", FinnHub),
             new FinanceWebSite("Globe", GlobeAndMail),
             new FinanceWebSite("Yahoo", YahooFinance),
-            new FinanceWebSite("GoogleWebSiteFinance", GoogleWebSiteFinance),
+            new FinanceWebSite("TwelveData", TwelveData),
             new FinanceWebSite("AlphaVantage", AlphaVantage)
         ];
 
@@ -81,6 +83,7 @@ class FinanceWebSites {
             case "NYSEAMERICAN":
             case "OPRA":
             case "OTCMKTS":
+            case "BATS":
                 countryCode = "us";
                 break;
             case "CVE":
@@ -303,6 +306,14 @@ class TdMarketsEtf {
     static getPropertyValue(key, defaultValue) {
         return defaultValue;
     }
+
+    /**
+     * getURL() will receive an instance of the throttling object to query if the limit would be exceeded.
+     * @returns {SiteThrottle}
+     */
+    static getThrottleObject() {
+        return null;
+    }
 }
 
 /**
@@ -355,6 +366,14 @@ class TdMarketsStock {
      */
     static getPropertyValue(key, defaultValue) {
         return defaultValue;
+    }
+
+    /**
+     * getURL() will receive an instance of the throttling object to query if the limit would be exceeded.
+     * @returns {SiteThrottle}
+     */
+    static getThrottleObject() {
+        return null;
     }
 }
 
@@ -467,6 +486,14 @@ class TdMarketResearch {
         }
 
         return symbol;
+    }
+
+    /**
+     * getURL() will receive an instance of the throttling object to query if the limit would be exceeded.
+     * @returns {SiteThrottle}
+     */
+    static getThrottleObject() {
+        return null;
     }
 }
 
@@ -604,6 +631,14 @@ class YahooFinance {
 
         }
         return modifiedSymbol;
+    }
+
+    /**
+     * getURL() will receive an instance of the throttling object to query if the limit would be exceeded.
+     * @returns {SiteThrottle}
+     */
+    static getThrottleObject() {
+        return null;
     }
 }
 
@@ -744,6 +779,14 @@ class GlobeAndMail {
 
         return symbol;
     }
+
+    /**
+     * getURL() will receive an instance of the throttling object to query if the limit would be exceeded.
+     * @returns {SiteThrottle}
+     */
+    static getThrottleObject() {
+        return null;
+    }
 }
 
 
@@ -847,6 +890,20 @@ class FinnHub {
     static getPropertyValue(key, defaultValue) {
         return defaultValue;
     }
+
+    /**
+     * getURL() will receive an instance of the throttling object to query if the limit would be exceeded.
+     * @returns {SiteThrottle}
+     */
+    static getThrottleObject() {
+        //  Basic throttle check
+        const limits = [
+            new ThresholdPeriod("SECOND", 30),
+            new ThresholdPeriod("MINUTE", 60)
+        ];
+
+        return new SiteThrottle("FINNHUB", limits);
+    }
 }
 
 class AlphaVantage {
@@ -877,7 +934,7 @@ class AlphaVantage {
         let jsonStr = null;
         try {
             jsonStr = UrlFetchApp.fetch(URL).getContentText();
-            data = AlphaVantage.parseResponse(jsonStr);
+            data = AlphaVantage.parseResponse(jsonStr, symbol, attribute);
         }
         catch (ex) {
             return data;
@@ -903,7 +960,7 @@ class AlphaVantage {
         }
 
         const countryCode = FinanceWebSites.getTickerCountryCode(symbol);
-        if (! (countryCode === "us" || countryCode === "fx")) {
+        if (!(countryCode === "us" || countryCode === "fx")) {
             return "";
         }
         const symbolParts = symbol.split(":");
@@ -930,33 +987,29 @@ class AlphaVantage {
     /**
      * 
      * @param {String} jsonStr 
+     * @param {String} symbol
+     * @param {String} _attribute
      * @returns {StockAttributes}
      */
-    static parseResponse(jsonStr) {
-        const data = new StockAttributes();
-        let failed = false;
-
+    static parseResponse(jsonStr, symbol, _attribute) {
         Logger.log(`content=${jsonStr}`);
+
+        const data = new StockAttributes();
+        const countryCode = FinanceWebSites.getTickerCountryCode(symbol);
+        const alphaVantageData = JSON.parse(jsonStr);
+
         try {
-            const alphaVantageData = JSON.parse(jsonStr);
-            data.stockPrice = alphaVantageData["Global Quote"]["05. price"];
+            if (countryCode === "fx") {
+                data.exchangeRate = alphaVantageData["Realtime Currency Exchange Rate"]["5. Exchange Rate"];
+            }
+            else {
+                data.stockPrice = alphaVantageData["Global Quote"]["05. price"];
+            }
+
             Logger.log(`Price=${data.stockPrice}`);
         }
         catch (ex) {
-            Logger.log("AlphaVantage JSON Parse Error (looking for price).");
-            failed = true;
-        }
-
-        if (failed) {
-            try {
-                const alphaVantageData = JSON.parse(jsonStr);
-                data.exchangeRate = alphaVantageData["Realtime Currency Exchange Rate"]["5. Exchange Rate"];
-                Logger.log(`Price=${data.stockPrice}`);
-            }
-            catch (ex) {
-                Logger.log("AlphaVantage JSON Parse Error (looking for currency).");
-            }
-
+            Logger.log(`AlphaVantage JSON Parse Error (looking for ${countryCode}. err=${ex}).`);
         }
 
         return data;
@@ -970,6 +1023,19 @@ class AlphaVantage {
      */
     static getPropertyValue(key, defaultValue) {
         return defaultValue;
+    }
+
+    /**
+     * getURL() will receive an instance of the throttling object to query if the limit would be exceeded.
+     * @returns {SiteThrottle}
+     */
+    static getThrottleObject() {
+        //  Basic throttle check
+        const limits = [
+            new ThresholdPeriod("DAY", 25)
+        ];
+
+        return new SiteThrottle("ALPHAVANTAGE", limits);
     }
 }
 
@@ -1002,10 +1068,15 @@ class GoogleWebSiteFinance {
     /**
      * 
      * @param {String} symbol 
-     * @param {String} _attribute
+     * @param {String} attribute
      * @returns {String}
      */
-    static getURL(symbol, _attribute) {
+    static getURL(symbol, attribute) {
+        if (attribute === "YIELDPCT" && FinanceWebSites.getTickerCountryCode(symbol) === "us") {
+            //  This site is very bad at yields for u.s.
+            return "";
+        }
+
         return `https://www.google.com/finance/quote/${GoogleWebSiteFinance.getTicker(symbol)}`;
     }
 
@@ -1031,7 +1102,7 @@ class GoogleWebSiteFinance {
         }
 
         if (html.indexOf("We couldn't find any match for your search.") !== -1) {
-            Logger.log("www.google.com/finance:  We couldn't find any match for your search.");
+            Logger.log(`www.google.com/finance:  We couldn't find any match for your search. symbol=${symbol}`);
             return data;
         }
 
@@ -1043,6 +1114,8 @@ class GoogleWebSiteFinance {
         else {
             data.stockPrice = GoogleWebSiteFinance.extractStockPrice(html, symbol);
         }
+
+        Logger.log(`Google. Stock=${symbol}. PERCENT=${data.yieldPct}. NAME=${data.stockName}. PRICE=${data.stockPrice}`);
 
         return data;
     }
@@ -1060,7 +1133,6 @@ class GoogleWebSiteFinance {
 
         if (dividendPercent !== null && dividendPercent.length > 1) {
             const tempPct = dividendPercent[1];
-            Logger.log(`Google. Stock=${symbol}. PERCENT=${tempPct}`);
 
             data = parseFloat(tempPct) / 100;
 
@@ -1083,7 +1155,6 @@ class GoogleWebSiteFinance {
         const priceMatch = html.match(/data-last-price="(\d{0,7}\.*\d{0,20})"/);
         if (priceMatch !== null && priceMatch.length > 1) {
             const tempPrice = priceMatch[1];
-            Logger.log(`Google. Stock=${symbol}.PRICE=${tempPrice}`);
 
             data = parseFloat(tempPrice);
 
@@ -1114,7 +1185,6 @@ class GoogleWebSiteFinance {
             const nameMatch = html.match(nameRegex);
             if (nameMatch !== null && nameMatch.length > 1) {
                 data = nameMatch[1].endsWith("(") ? nameMatch[1].slice(0, -1) : nameMatch[1];
-                Logger.log(`Google. Stock=${symbol}.NAME=${data}`);
             }
         }
 
@@ -1153,5 +1223,157 @@ class GoogleWebSiteFinance {
             }
         }
         return modifiedSymbol;
+    }
+
+
+    /**
+     * getURL() will receive an instance of the throttling object to query if the limit would be exceeded.
+     * @returns {SiteThrottle}
+     */
+    static getThrottleObject() {
+        return null;
+    }
+}
+
+class TwelveData {
+    /**
+     * 
+     * @param {String} symbol 
+     * @param {String} attribute 
+     * @returns {StockAttributes}
+     */
+    static getInfo(symbol, attribute = "PRICE") {
+        let data = new StockAttributes();
+
+        if (attribute !== "PRICE" && attribute !== "NAME") {
+            Logger.log(`TwelveData.  Only PRICE/NAME is supported: ${symbol}, ${attribute}`);
+            return data;
+        }
+
+        const countryCode = FinanceWebSites.getTickerCountryCode(symbol);
+        if (!(countryCode === "us" || countryCode === "fx")) {
+            Logger.log(`TwelveData --> Only U.S. stocks: ${symbol}`);
+            return data;
+        }
+
+        const apiKey = TwelveData.getApiKey();
+        const URL = TwelveData.getURL(symbol, attribute, apiKey);
+        Logger.log(`getInfo: TwelveData  ${symbol}.  URL = ${URL}.  Key = ${apiKey}`);
+
+        let jsonStr = null;
+        try {
+            jsonStr = UrlFetchApp.fetch(URL).getContentText();
+            data = TwelveData.parseResponse(jsonStr, symbol, attribute);
+        }
+        catch (ex) {
+            return data;
+        }
+
+        return data;
+    }
+
+    /**
+     * 
+     * @param {String} symbol 
+     * @param {String} attribute
+     * @param {String} API_KEY
+     * @returns {String}
+     */
+    static getURL(symbol, attribute, API_KEY = null) {
+        if (API_KEY === null) {
+            return "";
+        }
+
+        if (attribute !== "PRICE" && attribute !== "NAME") {
+            return "";
+        }
+
+        const countryCode = FinanceWebSites.getTickerCountryCode(symbol);
+        if (!(countryCode === "us" || countryCode === "fx")) {
+            return "";
+        }
+
+        let twelveDataSymbol = "";
+        if (countryCode === "fx") {
+            const symbolParts = symbol.split(":");
+            const fromCurrency = symbolParts[1].substring(0, 3);
+            const toCurrency = symbolParts[1].substring(3, 6);
+
+            twelveDataSymbol = `${fromCurrency}/${toCurrency}`;
+        }
+        else {
+            twelveDataSymbol = FinanceWebSites.getBaseTicker(symbol);
+        }
+
+        return `https://api.twelvedata.com/quote?symbol=${twelveDataSymbol}&apikey=${API_KEY}`;
+    }
+
+    /**
+     * 
+     * @returns {String}
+     */
+    static getApiKey() {
+        return FinanceWebSites.getApiKey("TWELVE_DATA_API_KEY");
+    }
+
+    /**
+     * 
+     * @param {String} jsonStr 
+     * @param {String} symbol
+     * @param {String} attribute
+     * @returns {StockAttributes}
+     */
+    static parseResponse(jsonStr, symbol, attribute) {
+        Logger.log(`content=${jsonStr}`);
+
+        const data = new StockAttributes();
+        const countryCode = FinanceWebSites.getTickerCountryCode(symbol);
+        const twelveData = JSON.parse(jsonStr);
+
+        try {
+            if (attribute === "NAME") {
+                data.stockName = twelveData["name"];
+                Logger.log(`TwelveData. Name=${data.stockName}`);
+            }
+            else if (attribute === "PRICE") {
+                if (countryCode === "fx") {
+                    data.exchangeRate = twelveData["close"];
+                }
+                else {
+                    data.stockPrice = twelveData["close"];
+                }
+                Logger.log(`TwelveData. Price=${data.stockPrice}`);
+            }
+        }
+        catch (ex) {
+            Logger.log(`TwelveData JSON Parse Error (looking for ${countryCode}. err=${ex}).`);
+        }
+
+        return data;
+    }
+
+    /**
+     * 
+     * @param {String} key 
+     * @param {any} defaultValue 
+     * @returns {any}
+     */
+    static getPropertyValue(key, defaultValue) {
+        return defaultValue;
+    }
+
+
+    /**
+     * Get an instance of the throttling object to query if the web limit would be exceeded.
+     * @returns {SiteThrottle}
+     */
+    static getThrottleObject() {
+        //  Basic throttle check
+        const limits = [
+            new ThresholdPeriod("MINUTE", 8),
+            new ThresholdPeriod("DAY", 800)
+        ];
+
+        return new SiteThrottle("TWELVEDATA", limits);
     }
 }

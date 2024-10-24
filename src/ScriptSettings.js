@@ -36,6 +36,12 @@ class ScriptSettings {      //  skipcq: JS-0128
         /** @type {PropertyData} */
         const myPropertyData = JSON.parse(myData);
 
+        if (PropertyData.isExpired(myPropertyData))
+        {
+            this.delete(propertyKey);
+            return null;
+        }
+
         return PropertyData.getData(myPropertyData);
     }
 

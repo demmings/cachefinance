@@ -3,7 +3,7 @@
 
 import { ScriptSettings } from "./SQL/ScriptSettings.js";
 import { FinanceWebSites, StockAttributes, FinanceWebSite } from "./CacheFinanceWebSites.js";
-import { CacheFinanceUtils } from "./CacheFinanceUtils.js";
+import { CacheFinanceUtils, SiteThrottle } from "./CacheFinanceUtils.js";
 export { ThirdPartyFinance, FinanceWebsiteSearch };
 
 class Logger {
@@ -79,50 +79,89 @@ class FinanceWebsiteSearch {
         if (symbols.length === 0) {
             return [];
         }
-        
+
         const MAX_TIME_FOR_FETCH_Ms = 25000;        //  Custom function times out at 30 seconds, so we need to limit.
         const bestStockSites = FinanceWebsiteSearch.readBestStockWebsites();
         const siteURLs = FinanceWebsiteSearch.getAllStockWebSiteFunctions(symbols, attribute, bestStockSites);
-        
+
         let batch = 1;
         const startTime = Date.now();
         let missingStockData = [...siteURLs];
-        while (missingStockData.length > 0 && (Date.now() - startTime) < MAX_TIME_FOR_FETCH_Ms) { 
-            const URLs = FinanceWebsiteSearch.getNextUrlBatch(missingStockData);
+        while (missingStockData.length > 0 && (Date.now() - startTime) < MAX_TIME_FOR_FETCH_Ms) {
+            const [URLs, batchUsedStockSites] = FinanceWebsiteSearch.getNextUrlBatch(missingStockData);
 
-            Logger.log(`Batch=${batch}. URLs${URLs}`);
+            Logger.log(`Batch=${batch}. URLs. ${URLs}`);
             const responses = FinanceWebsiteSearch.bulkSiteFetch(URLs);
-            const elapsedTime = Date.now() - startTime;
-            Logger.log(`Batch=${batch}. Responses=${responses.length}. Total Elapsed=${elapsedTime}`);
+            Logger.log(`Batch=${batch}. Responses=${responses.length}. Total Elapsed=${Date.now() - startTime}`);
             batch++;
 
-            FinanceWebsiteSearch.updateStockResults(missingStockData, URLs, responses, attribute, bestStockSites);
-            
-            missingStockData = missingStockData.filter(stock => ! stock.stockAttributes.isAttributeSet(attribute) && ! stock.isSitesDone())
+            FinanceWebsiteSearch.updateStockResults(batchUsedStockSites, URLs, responses, attribute, bestStockSites);
+
+            missingStockData = missingStockData.filter(stock => !stock.stockAttributes.isAttributeSet(attribute) && !stock.isSitesDone())
         }
 
         //  Note:  If separate CACHEFINANCES() run at the same time, the last process to finish will overwrite any new results
         //         from the other runs.  This is not critical, since it is ONLY used to improve the ordering of sites to call AND
         //         over time as the processes run on their own, the data will be corrected.
         FinanceWebsiteSearch.writeBestStockWebsites(bestStockSites);
-        
+
         return siteURLs.map(stock => stock.stockAttributes);
     }
 
     /**
-     * 
+     * Create a batch of URL's that will lookup our stock info in one large fetch.
      * @param {StockWebURL[]} missingStockData 
-     * @returns {String[]}
+     * @returns {[String[], StockWebURL[]]}
      */
     static getNextUrlBatch(missingStockData) {
         const MAX_FETCHALL_BATCH_SIZE = 50;
+        const URLs = [];
+        const batchUsedStockSites = [];
 
-        let URLs = missingStockData.map(url => url.getURL()).filter(url => url !== null && url !== '');
-        if (URLs.length > MAX_FETCHALL_BATCH_SIZE) {
-            URLs = URLs.slice(0, MAX_FETCHALL_BATCH_SIZE);
+        for (const stockData of missingStockData) {
+            let URL = "";
+            while (URL === "" && !stockData.isSitesDone()) {
+                if (FinanceWebsiteSearch.canRequestNow(stockData)) {
+                    URL = stockData.getURL();
+                }
+                else {
+                    stockData.skipToNextSite();
+                }
+            }
+            
+            if (URL !== "") {
+                URLs.push(URL);
+                batchUsedStockSites.push(stockData);
+            }
+
+            if (URLs.length >= MAX_FETCHALL_BATCH_SIZE) {
+                break;
+            }
         }
 
-        return URLs;
+        //  Update throttle status back to CACHE.
+        //  Updating CACHE is very slow, so it is done ONCE for each site after getting URL's.
+        for (const stockData of missingStockData) {
+            const throttleObject = stockData.getThrottleObject();
+            throttleObject?.update();
+        }
+
+        return [URLs, batchUsedStockSites];
+    }
+
+    /**
+     * 
+     * @param {StockWebURL} stockData 
+     * @returns {Boolean}
+     */
+    static canRequestNow(stockData) {
+        const URL = stockData.getURL();
+        if (URL === null || URL === '') {
+            return false;
+        }
+
+        const throttleObject = stockData.getThrottleObject();
+        return !(throttleObject !== null && !throttleObject.checkAndIncrement());
     }
 
     /**
@@ -135,10 +174,9 @@ class FinanceWebsiteSearch {
      */
     static updateStockResults(missingStockData, URLs, responses, attribute, bestStockSites) {
         for (let i = 0; i < URLs.length; i++) {
-            const matchingSites = missingStockData.filter(site => site.getURL() === URLs[i]);
-            matchingSites.forEach(site => site.parseResponse(responses[i], attribute));
-            matchingSites.forEach(site => site.updateBestSites(bestStockSites, attribute));
-            matchingSites.forEach(site => site.skipToNextSite());
+            missingStockData[i].parseResponse(responses[i], attribute);
+            missingStockData[i].updateBestSites(bestStockSites, attribute);
+            missingStockData[i].skipToNextSite();
         }
     }
 
@@ -152,12 +190,14 @@ class FinanceWebsiteSearch {
     static getAllStockWebSiteFunctions(symbols, attribute, bestStockSites) {
         const stockURLs = [];
         const apiMap = new Map();
+        const throttleMap = new Map();
         const siteInfo = new FinanceWebSites();
         const siteList = siteInfo.get();
 
         //  Getting this is slow, so save and use later.
         for (const site of siteList) {
             apiMap.set(site.siteName, site.siteObject.getApiKey())
+            throttleMap.set(site.siteName, site.siteObject.getThrottleObject())
         }
 
         for (const symbol of symbols) {
@@ -166,7 +206,7 @@ class FinanceWebsiteSearch {
             const skipSite = bestStockSites[CacheFinanceUtils.makeIgnoreSiteCacheKey(symbol, attribute)];
 
             for (const site of siteList) {
-                stockURL.addSiteURL(site.siteName, bestSite, skipSite, site.siteObject.getURL(symbol, attribute, apiMap.get(site.siteName)), site.siteObject.parseResponse);
+                stockURL.addSiteURL(site.siteName, bestSite, skipSite, site.siteObject.getURL(symbol, attribute, apiMap.get(site.siteName)), site.siteObject.parseResponse, throttleMap.get(site.siteName));
             }
 
             stockURLs.push(stockURL);
@@ -181,8 +221,8 @@ class FinanceWebsiteSearch {
      */
     static readBestStockWebsites() {
         const longCache = new ScriptSettings();
-        const siteObject = longCache.get("CACHE_WEBSITES"); 
-        
+        const siteObject = longCache.get("CACHE_WEBSITES");
+
         return siteObject === null ? {} : siteObject;
     }
 
@@ -192,7 +232,7 @@ class FinanceWebsiteSearch {
      */
     static writeBestStockWebsites(siteObject) {
         const longCache = new ScriptSettings();
-        longCache.put("CACHE_WEBSITES", siteObject, 1825);    
+        longCache.put("CACHE_WEBSITES", siteObject, 1825);
     }
 
 
@@ -203,7 +243,7 @@ class FinanceWebsiteSearch {
      */
     static bulkSiteFetch(URLs) {
         const filteredURLs = URLs.filter(url => url.trim() !== '');
-        const fetchURLs = filteredURLs.map(url => {    
+        const fetchURLs = filteredURLs.map(url => {
             return {
                 'url': url,         // skipcq: JS-0240 
                 'method': 'get',
@@ -313,12 +353,13 @@ class FinanceWebsiteSearch {
  * @classdesc Tracks and generates URLs to find stock data.  Also tracks parsing functions for extracting data from HTML.
  */
 class StockWebURL {
-    constructor (symbol) {
+    constructor(symbol) {
         this.symbol = symbol;
         this.siteName = [];
         this.siteURL = [];
         this.bestSites = [];
         this.parseFunction = [];
+        this.throttleObject = [];
         /** @type {StockAttributes} */
         this.stockAttributes = new StockAttributes();
         this.siteIterator = 0;
@@ -329,23 +370,26 @@ class StockWebURL {
      * @param {String} siteName 
      * @param {String} URL 
      * @param {Object} parseResponseFunction 
+     * @param {SiteThrottle} throttleObject
      * @returns 
      */
-    addSiteURL(siteName, bestSite, skipSite, URL, parseResponseFunction) {
+    addSiteURL(siteName, bestSite, skipSite, URL, parseResponseFunction, throttleObject) {
         if (URL.trim() === '' || siteName === skipSite) {
             return;
-        } 
+        }
 
         if (siteName === bestSite) {
             this.siteName.unshift(siteName);
             this.siteURL.unshift(URL);
             this.parseFunction.unshift(parseResponseFunction);
+            this.throttleObject.unshift(throttleObject);
             this.bestSites.unshift(true);
         }
         else {
             this.siteName.push(siteName);
             this.siteURL.push(URL);
             this.parseFunction.push(parseResponseFunction);
+            this.throttleObject.push(throttleObject);
             this.bestSites.push(false);
         }
     }
@@ -355,7 +399,15 @@ class StockWebURL {
      * @returns {String}
      */
     getURL() {
-        return  this.siteIterator < this.siteURL.length ? this.siteURL[this.siteIterator] : null;  
+        return this.siteIterator < this.siteURL.length ? this.siteURL[this.siteIterator] : null;
+    }
+
+    /**
+     * 
+     * @returns {SiteThrottle}
+     */
+    getThrottleObject() {
+        return this.siteIterator < this.throttleObject.length ? this.throttleObject[this.siteIterator] : null;
     }
 
     /**
@@ -380,7 +432,7 @@ class StockWebURL {
      */
     updateBestSites(bestStockSites, attribute) {
         const key = CacheFinanceUtils.makeCacheKey(this.symbol, attribute);
-        bestStockSites[key] = (! this?.stockAttributes.isAttributeSet(attribute)) ? "" : this.siteName[this.siteIterator];
+        bestStockSites[key] = (!this?.stockAttributes.isAttributeSet(attribute)) ? "" : this.siteName[this.siteIterator];
     }
 
     /**

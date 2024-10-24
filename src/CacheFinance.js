@@ -40,7 +40,7 @@ function testCacheFinances() {                                  // skipcq: JS-01
  * @param {string} attribute - ["price", "yieldpct", "name"] - 
  * @param {any} googleFinanceValue - Optional.  Use GOOGLEFINANCE() to get default value, if '#N/A' will read cache.
  * BACKDOOR commands are entered using this parameter.
- *  "?" - List all backdoor abilities (SET, GET, SETBLOCKED, GETBLOCKED, LIST, REMOVE, CLEARCACHE, TEST)
+ *  "?" - List all backdoor abilities (SET, GET, SETBLOCKED, GETBLOCKED, LIST, REMOVE, CLEARCACHE, EXPIRECACHE, TEST)
  * e.g. =CACHEFINANCE("", "", "CLEARCACHE") or =CACHEFINANCE("TSE:CJP", "price", "GET")
  * @param {String} cmdOption - Option parameter used only with backdoor commands.
  * @returns {any}
@@ -325,6 +325,7 @@ class CacheFinance {
                 ["    ? (display help)"],
                 ["    TEST (tests web sites)"],
                 ["    CLEARCACHE (remove cache - run again if timeout. If symbol/attribute blank - removes all)"],
+                ["    EXPIRECACHE (removes OLD cached items)"],
                 ["    REMOVE (pref. site set as do not use site for symbol/attribute)"],
                 ["    LIST (show all supported web lookups)"],
                 ["    GET (current pref. site for symbol/attribute)"],
@@ -343,6 +344,10 @@ class CacheFinance {
                     ScriptSettings.expire(true);
                 }
                 return 'Cache Cleared';
+
+            case "EXPIRECACHE":
+                ScriptSettings.expire(false);
+                return 'Old Cache Items Removed';
 
             case "REMOVE":
                 return CacheFinance.removeCurrentProviderAsFavourite(symbol, attribute);

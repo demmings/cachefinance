@@ -23,7 +23,7 @@ function testCacheFinances() {                                  // skipcq: JS-01
  * @param {string} attribute - ["price", "yieldpct", "name"] - 
  * @param {any} googleFinanceValue - Optional.  Use GOOGLEFINANCE() to get default value, if '#N/A' will read cache.
  * BACKDOOR commands are entered using this parameter.
- *  "?" - List all backdoor abilities (SET, GET, SETBLOCKED, GETBLOCKED, LIST, REMOVE, CLEARCACHE, TEST)
+ *  "?" - List all backdoor abilities (SET, GET, SETBLOCKED, GETBLOCKED, LIST, REMOVE, CLEARCACHE, EXPIRECACHE, TEST)
  * e.g. =CACHEFINANCE("", "", "CLEARCACHE") or =CACHEFINANCE("TSE:CJP", "price", "GET")
  * @param {String} cmdOption - Option parameter used only with backdoor commands.
  * @returns {any}
@@ -308,6 +308,7 @@ class CacheFinance {
                 ["    ? (display help)"],
                 ["    TEST (tests web sites)"],
                 ["    CLEARCACHE (remove cache - run again if timeout. If symbol/attribute blank - removes all)"],
+                ["    EXPIRECACHE (removes OLD cached items)"],
                 ["    REMOVE (pref. site set as do not use site for symbol/attribute)"],
                 ["    LIST (show all supported web lookups)"],
                 ["    GET (current pref. site for symbol/attribute)"],
@@ -326,6 +327,10 @@ class CacheFinance {
                     ScriptSettings.expire(true);
                 }
                 return 'Cache Cleared';
+
+            case "EXPIRECACHE":
+                ScriptSettings.expire(false);
+                return 'Old Cache Items Removed';
 
             case "REMOVE":
                 return CacheFinance.removeCurrentProviderAsFavourite(symbol, attribute);
@@ -501,6 +506,12 @@ class ScriptSettings {      //  skipcq: JS-0128
 
         /** @type {PropertyData} */
         const myPropertyData = JSON.parse(myData);
+
+        if (PropertyData.isExpired(myPropertyData))
+        {
+            this.delete(propertyKey);
+            return null;
+        }
 
         return PropertyData.getData(myPropertyData);
     }
@@ -762,50 +773,89 @@ class FinanceWebsiteSearch {
         if (symbols.length === 0) {
             return [];
         }
-        
+
         const MAX_TIME_FOR_FETCH_Ms = 25000;        //  Custom function times out at 30 seconds, so we need to limit.
         const bestStockSites = FinanceWebsiteSearch.readBestStockWebsites();
         const siteURLs = FinanceWebsiteSearch.getAllStockWebSiteFunctions(symbols, attribute, bestStockSites);
-        
+
         let batch = 1;
         const startTime = Date.now();
         let missingStockData = [...siteURLs];
-        while (missingStockData.length > 0 && (Date.now() - startTime) < MAX_TIME_FOR_FETCH_Ms) { 
-            const URLs = FinanceWebsiteSearch.getNextUrlBatch(missingStockData);
+        while (missingStockData.length > 0 && (Date.now() - startTime) < MAX_TIME_FOR_FETCH_Ms) {
+            const [URLs, batchUsedStockSites] = FinanceWebsiteSearch.getNextUrlBatch(missingStockData);
 
-            Logger.log(`Batch=${batch}. URLs${URLs}`);
+            Logger.log(`Batch=${batch}. URLs. ${URLs}`);
             const responses = FinanceWebsiteSearch.bulkSiteFetch(URLs);
-            const elapsedTime = Date.now() - startTime;
-            Logger.log(`Batch=${batch}. Responses=${responses.length}. Total Elapsed=${elapsedTime}`);
+            Logger.log(`Batch=${batch}. Responses=${responses.length}. Total Elapsed=${Date.now() - startTime}`);
             batch++;
 
-            FinanceWebsiteSearch.updateStockResults(missingStockData, URLs, responses, attribute, bestStockSites);
-            
-            missingStockData = missingStockData.filter(stock => ! stock.stockAttributes.isAttributeSet(attribute) && ! stock.isSitesDone())
+            FinanceWebsiteSearch.updateStockResults(batchUsedStockSites, URLs, responses, attribute, bestStockSites);
+
+            missingStockData = missingStockData.filter(stock => !stock.stockAttributes.isAttributeSet(attribute) && !stock.isSitesDone())
         }
 
         //  Note:  If separate CACHEFINANCES() run at the same time, the last process to finish will overwrite any new results
         //         from the other runs.  This is not critical, since it is ONLY used to improve the ordering of sites to call AND
         //         over time as the processes run on their own, the data will be corrected.
         FinanceWebsiteSearch.writeBestStockWebsites(bestStockSites);
-        
+
         return siteURLs.map(stock => stock.stockAttributes);
     }
 
     /**
-     * 
+     * Create a batch of URL's that will lookup our stock info in one large fetch.
      * @param {StockWebURL[]} missingStockData 
-     * @returns {String[]}
+     * @returns {[String[], StockWebURL[]]}
      */
     static getNextUrlBatch(missingStockData) {
         const MAX_FETCHALL_BATCH_SIZE = 50;
+        const URLs = [];
+        const batchUsedStockSites = [];
 
-        let URLs = missingStockData.map(url => url.getURL()).filter(url => url !== null && url !== '');
-        if (URLs.length > MAX_FETCHALL_BATCH_SIZE) {
-            URLs = URLs.slice(0, MAX_FETCHALL_BATCH_SIZE);
+        for (const stockData of missingStockData) {
+            let URL = "";
+            while (URL === "" && !stockData.isSitesDone()) {
+                if (FinanceWebsiteSearch.canRequestNow(stockData)) {
+                    URL = stockData.getURL();
+                }
+                else {
+                    stockData.skipToNextSite();
+                }
+            }
+            
+            if (URL !== "") {
+                URLs.push(URL);
+                batchUsedStockSites.push(stockData);
+            }
+
+            if (URLs.length >= MAX_FETCHALL_BATCH_SIZE) {
+                break;
+            }
         }
 
-        return URLs;
+        //  Update throttle status back to CACHE.
+        //  Updating CACHE is very slow, so it is done ONCE for each site after getting URL's.
+        for (const stockData of missingStockData) {
+            const throttleObject = stockData.getThrottleObject();
+            throttleObject?.update();
+        }
+
+        return [URLs, batchUsedStockSites];
+    }
+
+    /**
+     * 
+     * @param {StockWebURL} stockData 
+     * @returns {Boolean}
+     */
+    static canRequestNow(stockData) {
+        const URL = stockData.getURL();
+        if (URL === null || URL === '') {
+            return false;
+        }
+
+        const throttleObject = stockData.getThrottleObject();
+        return !(throttleObject !== null && !throttleObject.checkAndIncrement());
     }
 
     /**
@@ -818,10 +868,9 @@ class FinanceWebsiteSearch {
      */
     static updateStockResults(missingStockData, URLs, responses, attribute, bestStockSites) {
         for (let i = 0; i < URLs.length; i++) {
-            const matchingSites = missingStockData.filter(site => site.getURL() === URLs[i]);
-            matchingSites.forEach(site => site.parseResponse(responses[i], attribute));
-            matchingSites.forEach(site => site.updateBestSites(bestStockSites, attribute));
-            matchingSites.forEach(site => site.skipToNextSite());
+            missingStockData[i].parseResponse(responses[i], attribute);
+            missingStockData[i].updateBestSites(bestStockSites, attribute);
+            missingStockData[i].skipToNextSite();
         }
     }
 
@@ -835,12 +884,14 @@ class FinanceWebsiteSearch {
     static getAllStockWebSiteFunctions(symbols, attribute, bestStockSites) {
         const stockURLs = [];
         const apiMap = new Map();
+        const throttleMap = new Map();
         const siteInfo = new FinanceWebSites();
         const siteList = siteInfo.get();
 
         //  Getting this is slow, so save and use later.
         for (const site of siteList) {
             apiMap.set(site.siteName, site.siteObject.getApiKey())
+            throttleMap.set(site.siteName, site.siteObject.getThrottleObject())
         }
 
         for (const symbol of symbols) {
@@ -849,7 +900,7 @@ class FinanceWebsiteSearch {
             const skipSite = bestStockSites[CacheFinanceUtils.makeIgnoreSiteCacheKey(symbol, attribute)];
 
             for (const site of siteList) {
-                stockURL.addSiteURL(site.siteName, bestSite, skipSite, site.siteObject.getURL(symbol, attribute, apiMap.get(site.siteName)), site.siteObject.parseResponse);
+                stockURL.addSiteURL(site.siteName, bestSite, skipSite, site.siteObject.getURL(symbol, attribute, apiMap.get(site.siteName)), site.siteObject.parseResponse, throttleMap.get(site.siteName));
             }
 
             stockURLs.push(stockURL);
@@ -864,8 +915,8 @@ class FinanceWebsiteSearch {
      */
     static readBestStockWebsites() {
         const longCache = new ScriptSettings();
-        const siteObject = longCache.get("CACHE_WEBSITES"); 
-        
+        const siteObject = longCache.get("CACHE_WEBSITES");
+
         return siteObject === null ? {} : siteObject;
     }
 
@@ -875,7 +926,7 @@ class FinanceWebsiteSearch {
      */
     static writeBestStockWebsites(siteObject) {
         const longCache = new ScriptSettings();
-        longCache.put("CACHE_WEBSITES", siteObject, 1825);    
+        longCache.put("CACHE_WEBSITES", siteObject, 1825);
     }
 
 
@@ -886,7 +937,7 @@ class FinanceWebsiteSearch {
      */
     static bulkSiteFetch(URLs) {
         const filteredURLs = URLs.filter(url => url.trim() !== '');
-        const fetchURLs = filteredURLs.map(url => {    
+        const fetchURLs = filteredURLs.map(url => {
             return {
                 'url': url,         // skipcq: JS-0240 
                 'method': 'get',
@@ -996,12 +1047,13 @@ class FinanceWebsiteSearch {
  * @classdesc Tracks and generates URLs to find stock data.  Also tracks parsing functions for extracting data from HTML.
  */
 class StockWebURL {
-    constructor (symbol) {
+    constructor(symbol) {
         this.symbol = symbol;
         this.siteName = [];
         this.siteURL = [];
         this.bestSites = [];
         this.parseFunction = [];
+        this.throttleObject = [];
         /** @type {StockAttributes} */
         this.stockAttributes = new StockAttributes();
         this.siteIterator = 0;
@@ -1012,23 +1064,26 @@ class StockWebURL {
      * @param {String} siteName 
      * @param {String} URL 
      * @param {Object} parseResponseFunction 
+     * @param {SiteThrottle} throttleObject
      * @returns 
      */
-    addSiteURL(siteName, bestSite, skipSite, URL, parseResponseFunction) {
+    addSiteURL(siteName, bestSite, skipSite, URL, parseResponseFunction, throttleObject) {
         if (URL.trim() === '' || siteName === skipSite) {
             return;
-        } 
+        }
 
         if (siteName === bestSite) {
             this.siteName.unshift(siteName);
             this.siteURL.unshift(URL);
             this.parseFunction.unshift(parseResponseFunction);
+            this.throttleObject.unshift(throttleObject);
             this.bestSites.unshift(true);
         }
         else {
             this.siteName.push(siteName);
             this.siteURL.push(URL);
             this.parseFunction.push(parseResponseFunction);
+            this.throttleObject.push(throttleObject);
             this.bestSites.push(false);
         }
     }
@@ -1038,7 +1093,15 @@ class StockWebURL {
      * @returns {String}
      */
     getURL() {
-        return  this.siteIterator < this.siteURL.length ? this.siteURL[this.siteIterator] : null;  
+        return this.siteIterator < this.siteURL.length ? this.siteURL[this.siteIterator] : null;
+    }
+
+    /**
+     * 
+     * @returns {SiteThrottle}
+     */
+    getThrottleObject() {
+        return this.siteIterator < this.throttleObject.length ? this.throttleObject[this.siteIterator] : null;
     }
 
     /**
@@ -1063,7 +1126,7 @@ class StockWebURL {
      */
     updateBestSites(bestStockSites, attribute) {
         const key = CacheFinanceUtils.makeCacheKey(this.symbol, attribute);
-        bestStockSites[key] = (! this?.stockAttributes.isAttributeSet(attribute)) ? "" : this.siteName[this.siteIterator];
+        bestStockSites[key] = (!this?.stockAttributes.isAttributeSet(attribute)) ? "" : this.siteName[this.siteIterator];
     }
 
     /**
@@ -1323,7 +1386,6 @@ class CacheFinanceTest {
      */
     execute() {
         this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "NYSEARCA:VOO");
-        this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "TSE:CJP");
         this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "TSE:RY");
         this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "NASDAQ:VTC");
         
@@ -1340,6 +1402,9 @@ class CacheFinanceTest {
         this.cacheTestRun.run("Finnhub", FinnHub.getInfo, "NYSEARCA:VOO", "PRICE");
         this.cacheTestRun.run("AlphaVantage", AlphaVantage.getInfo, "NYSEARCA:VOO", "PRICE");
         this.cacheTestRun.run("AlphaVantage", AlphaVantage.getInfo, "CURRENCY:USDEUR", "PRICE");
+        this.cacheTestRun.run("TwelveData", TwelveData.getInfo, "NYSEARCA:VOO", "PRICE");
+        this.cacheTestRun.run("TwelveData", TwelveData.getInfo, "NYSEARCA:VOO", "NAME");
+        this.cacheTestRun.run("TwelveData", TwelveData.getInfo, "CURRENCY:USDEUR", "PRICE");
 
         return this.cacheTestRun.getTestRunResults();
     }
@@ -1557,12 +1622,13 @@ class FinanceWebSites {
      */
     constructor() {
         this.siteList = [
-            new FinanceWebSite("FinnHub", FinnHub),
+            new FinanceWebSite("GoogleWebSiteFinance", GoogleWebSiteFinance),
             new FinanceWebSite("TDEtf", TdMarketsEtf),
             new FinanceWebSite("TDStock", TdMarketsStock),
+            new FinanceWebSite("FinnHub", FinnHub),
             new FinanceWebSite("Globe", GlobeAndMail),
             new FinanceWebSite("Yahoo", YahooFinance),
-            new FinanceWebSite("GoogleWebSiteFinance", GoogleWebSiteFinance),
+            new FinanceWebSite("TwelveData", TwelveData),
             new FinanceWebSite("AlphaVantage", AlphaVantage)
         ];
 
@@ -1613,6 +1679,7 @@ class FinanceWebSites {
             case "NYSEAMERICAN":
             case "OPRA":
             case "OTCMKTS":
+            case "BATS":
                 countryCode = "us";
                 break;
             case "CVE":
@@ -1835,6 +1902,14 @@ class TdMarketsEtf {
     static getPropertyValue(key, defaultValue) {
         return defaultValue;
     }
+
+    /**
+     * getURL() will receive an instance of the throttling object to query if the limit would be exceeded.
+     * @returns {SiteThrottle}
+     */
+    static getThrottleObject() {
+        return null;
+    }
 }
 
 /**
@@ -1887,6 +1962,14 @@ class TdMarketsStock {
      */
     static getPropertyValue(key, defaultValue) {
         return defaultValue;
+    }
+
+    /**
+     * getURL() will receive an instance of the throttling object to query if the limit would be exceeded.
+     * @returns {SiteThrottle}
+     */
+    static getThrottleObject() {
+        return null;
     }
 }
 
@@ -1999,6 +2082,14 @@ class TdMarketResearch {
         }
 
         return symbol;
+    }
+
+    /**
+     * getURL() will receive an instance of the throttling object to query if the limit would be exceeded.
+     * @returns {SiteThrottle}
+     */
+    static getThrottleObject() {
+        return null;
     }
 }
 
@@ -2136,6 +2227,14 @@ class YahooFinance {
 
         }
         return modifiedSymbol;
+    }
+
+    /**
+     * getURL() will receive an instance of the throttling object to query if the limit would be exceeded.
+     * @returns {SiteThrottle}
+     */
+    static getThrottleObject() {
+        return null;
     }
 }
 
@@ -2276,6 +2375,14 @@ class GlobeAndMail {
 
         return symbol;
     }
+
+    /**
+     * getURL() will receive an instance of the throttling object to query if the limit would be exceeded.
+     * @returns {SiteThrottle}
+     */
+    static getThrottleObject() {
+        return null;
+    }
 }
 
 
@@ -2379,6 +2486,20 @@ class FinnHub {
     static getPropertyValue(key, defaultValue) {
         return defaultValue;
     }
+
+    /**
+     * getURL() will receive an instance of the throttling object to query if the limit would be exceeded.
+     * @returns {SiteThrottle}
+     */
+    static getThrottleObject() {
+        //  Basic throttle check
+        const limits = [
+            new ThresholdPeriod("SECOND", 30),
+            new ThresholdPeriod("MINUTE", 60)
+        ];
+
+        return new SiteThrottle("FINNHUB", limits);
+    }
 }
 
 class AlphaVantage {
@@ -2409,7 +2530,7 @@ class AlphaVantage {
         let jsonStr = null;
         try {
             jsonStr = UrlFetchApp.fetch(URL).getContentText();
-            data = AlphaVantage.parseResponse(jsonStr);
+            data = AlphaVantage.parseResponse(jsonStr, symbol, attribute);
         }
         catch (ex) {
             return data;
@@ -2435,7 +2556,7 @@ class AlphaVantage {
         }
 
         const countryCode = FinanceWebSites.getTickerCountryCode(symbol);
-        if (! (countryCode === "us" || countryCode === "fx")) {
+        if (!(countryCode === "us" || countryCode === "fx")) {
             return "";
         }
         const symbolParts = symbol.split(":");
@@ -2462,33 +2583,29 @@ class AlphaVantage {
     /**
      * 
      * @param {String} jsonStr 
+     * @param {String} symbol
+     * @param {String} _attribute
      * @returns {StockAttributes}
      */
-    static parseResponse(jsonStr) {
-        const data = new StockAttributes();
-        let failed = false;
-
+    static parseResponse(jsonStr, symbol, _attribute) {
         Logger.log(`content=${jsonStr}`);
+
+        const data = new StockAttributes();
+        const countryCode = FinanceWebSites.getTickerCountryCode(symbol);
+        const alphaVantageData = JSON.parse(jsonStr);
+
         try {
-            const alphaVantageData = JSON.parse(jsonStr);
-            data.stockPrice = alphaVantageData["Global Quote"]["05. price"];
+            if (countryCode === "fx") {
+                data.exchangeRate = alphaVantageData["Realtime Currency Exchange Rate"]["5. Exchange Rate"];
+            }
+            else {
+                data.stockPrice = alphaVantageData["Global Quote"]["05. price"];
+            }
+
             Logger.log(`Price=${data.stockPrice}`);
         }
         catch (ex) {
-            Logger.log("AlphaVantage JSON Parse Error (looking for price).");
-            failed = true;
-        }
-
-        if (failed) {
-            try {
-                const alphaVantageData = JSON.parse(jsonStr);
-                data.exchangeRate = alphaVantageData["Realtime Currency Exchange Rate"]["5. Exchange Rate"];
-                Logger.log(`Price=${data.stockPrice}`);
-            }
-            catch (ex) {
-                Logger.log("AlphaVantage JSON Parse Error (looking for currency).");
-            }
-
+            Logger.log(`AlphaVantage JSON Parse Error (looking for ${countryCode}. err=${ex}).`);
         }
 
         return data;
@@ -2502,6 +2619,19 @@ class AlphaVantage {
      */
     static getPropertyValue(key, defaultValue) {
         return defaultValue;
+    }
+
+    /**
+     * getURL() will receive an instance of the throttling object to query if the limit would be exceeded.
+     * @returns {SiteThrottle}
+     */
+    static getThrottleObject() {
+        //  Basic throttle check
+        const limits = [
+            new ThresholdPeriod("DAY", 25)
+        ];
+
+        return new SiteThrottle("ALPHAVANTAGE", limits);
     }
 }
 
@@ -2534,10 +2664,15 @@ class GoogleWebSiteFinance {
     /**
      * 
      * @param {String} symbol 
-     * @param {String} _attribute
+     * @param {String} attribute
      * @returns {String}
      */
-    static getURL(symbol, _attribute) {
+    static getURL(symbol, attribute) {
+        if (attribute === "YIELDPCT" && FinanceWebSites.getTickerCountryCode(symbol) === "us") {
+            //  This site is very bad at yields for u.s.
+            return "";
+        }
+
         return `https://www.google.com/finance/quote/${GoogleWebSiteFinance.getTicker(symbol)}`;
     }
 
@@ -2563,7 +2698,7 @@ class GoogleWebSiteFinance {
         }
 
         if (html.indexOf("We couldn't find any match for your search.") !== -1) {
-            Logger.log("www.google.com/finance:  We couldn't find any match for your search.");
+            Logger.log(`www.google.com/finance:  We couldn't find any match for your search. symbol=${symbol}`);
             return data;
         }
 
@@ -2575,6 +2710,8 @@ class GoogleWebSiteFinance {
         else {
             data.stockPrice = GoogleWebSiteFinance.extractStockPrice(html, symbol);
         }
+
+        Logger.log(`Google. Stock=${symbol}. PERCENT=${data.yieldPct}. NAME=${data.stockName}. PRICE=${data.stockPrice}`);
 
         return data;
     }
@@ -2592,7 +2729,6 @@ class GoogleWebSiteFinance {
 
         if (dividendPercent !== null && dividendPercent.length > 1) {
             const tempPct = dividendPercent[1];
-            Logger.log(`Google. Stock=${symbol}. PERCENT=${tempPct}`);
 
             data = parseFloat(tempPct) / 100;
 
@@ -2615,7 +2751,6 @@ class GoogleWebSiteFinance {
         const priceMatch = html.match(/data-last-price="(\d{0,7}\.*\d{0,20})"/);
         if (priceMatch !== null && priceMatch.length > 1) {
             const tempPrice = priceMatch[1];
-            Logger.log(`Google. Stock=${symbol}.PRICE=${tempPrice}`);
 
             data = parseFloat(tempPrice);
 
@@ -2646,7 +2781,6 @@ class GoogleWebSiteFinance {
             const nameMatch = html.match(nameRegex);
             if (nameMatch !== null && nameMatch.length > 1) {
                 data = nameMatch[1].endsWith("(") ? nameMatch[1].slice(0, -1) : nameMatch[1];
-                Logger.log(`Google. Stock=${symbol}.NAME=${data}`);
             }
         }
 
@@ -2686,7 +2820,160 @@ class GoogleWebSiteFinance {
         }
         return modifiedSymbol;
     }
+
+
+    /**
+     * getURL() will receive an instance of the throttling object to query if the limit would be exceeded.
+     * @returns {SiteThrottle}
+     */
+    static getThrottleObject() {
+        return null;
+    }
 }
+
+class TwelveData {
+    /**
+     * 
+     * @param {String} symbol 
+     * @param {String} attribute 
+     * @returns {StockAttributes}
+     */
+    static getInfo(symbol, attribute = "PRICE") {
+        let data = new StockAttributes();
+
+        if (attribute !== "PRICE" && attribute !== "NAME") {
+            Logger.log(`TwelveData.  Only PRICE/NAME is supported: ${symbol}, ${attribute}`);
+            return data;
+        }
+
+        const countryCode = FinanceWebSites.getTickerCountryCode(symbol);
+        if (!(countryCode === "us" || countryCode === "fx")) {
+            Logger.log(`TwelveData --> Only U.S. stocks: ${symbol}`);
+            return data;
+        }
+
+        const apiKey = TwelveData.getApiKey();
+        const URL = TwelveData.getURL(symbol, attribute, apiKey);
+        Logger.log(`getInfo: TwelveData  ${symbol}.  URL = ${URL}.  Key = ${apiKey}`);
+
+        let jsonStr = null;
+        try {
+            jsonStr = UrlFetchApp.fetch(URL).getContentText();
+            data = TwelveData.parseResponse(jsonStr, symbol, attribute);
+        }
+        catch (ex) {
+            return data;
+        }
+
+        return data;
+    }
+
+    /**
+     * 
+     * @param {String} symbol 
+     * @param {String} attribute
+     * @param {String} API_KEY
+     * @returns {String}
+     */
+    static getURL(symbol, attribute, API_KEY = null) {
+        if (API_KEY === null) {
+            return "";
+        }
+
+        if (attribute !== "PRICE" && attribute !== "NAME") {
+            return "";
+        }
+
+        const countryCode = FinanceWebSites.getTickerCountryCode(symbol);
+        if (!(countryCode === "us" || countryCode === "fx")) {
+            return "";
+        }
+
+        let twelveDataSymbol = "";
+        if (countryCode === "fx") {
+            const symbolParts = symbol.split(":");
+            const fromCurrency = symbolParts[1].substring(0, 3);
+            const toCurrency = symbolParts[1].substring(3, 6);
+
+            twelveDataSymbol = `${fromCurrency}/${toCurrency}`;
+        }
+        else {
+            twelveDataSymbol = FinanceWebSites.getBaseTicker(symbol);
+        }
+
+        return `https://api.twelvedata.com/quote?symbol=${twelveDataSymbol}&apikey=${API_KEY}`;
+    }
+
+    /**
+     * 
+     * @returns {String}
+     */
+    static getApiKey() {
+        return FinanceWebSites.getApiKey("TWELVE_DATA_API_KEY");
+    }
+
+    /**
+     * 
+     * @param {String} jsonStr 
+     * @param {String} symbol
+     * @param {String} attribute
+     * @returns {StockAttributes}
+     */
+    static parseResponse(jsonStr, symbol, attribute) {
+        Logger.log(`content=${jsonStr}`);
+
+        const data = new StockAttributes();
+        const countryCode = FinanceWebSites.getTickerCountryCode(symbol);
+        const twelveData = JSON.parse(jsonStr);
+
+        try {
+            if (attribute === "NAME") {
+                data.stockName = twelveData["name"];
+                Logger.log(`TwelveData. Name=${data.stockName}`);
+            }
+            else if (attribute === "PRICE") {
+                if (countryCode === "fx") {
+                    data.exchangeRate = twelveData["close"];
+                }
+                else {
+                    data.stockPrice = twelveData["close"];
+                }
+                Logger.log(`TwelveData. Price=${data.stockPrice}`);
+            }
+        }
+        catch (ex) {
+            Logger.log(`TwelveData JSON Parse Error (looking for ${countryCode}. err=${ex}).`);
+        }
+
+        return data;
+    }
+
+    /**
+     * 
+     * @param {String} key 
+     * @param {any} defaultValue 
+     * @returns {any}
+     */
+    static getPropertyValue(key, defaultValue) {
+        return defaultValue;
+    }
+
+
+    /**
+     * Get an instance of the throttling object to query if the web limit would be exceeded.
+     * @returns {SiteThrottle}
+     */
+    static getThrottleObject() {
+        //  Basic throttle check
+        const limits = [
+            new ThresholdPeriod("MINUTE", 8),
+            new ThresholdPeriod("DAY", 800)
+        ];
+
+        return new SiteThrottle("TWELVEDATA", limits);
+    }
+}
+
 
 /**
  * @classdesc Multi-purpose functions used within the cache finance custom functions.
@@ -2886,6 +3173,254 @@ class CacheFinanceUtils {                       // skipcq: JS-0128
      */
     static convertSingleToDoubleArray(singleArray) {
         return singleArray.map(item => [item]);
+    }
+}
+
+class SiteThrottle {
+    /**
+     * @param {String} siteID
+     * @param {ThresholdPeriod[]} thresholds 
+     */
+    constructor(siteID, thresholds) {
+        this.siteID = siteID;
+        this.thresholds = thresholds;
+        this.periodKeys = [];
+        this.periodCount = [];
+    }
+
+    /**
+     * @returns {Boolean} - true is ok to make request
+     */
+    checkAndIncrement() {
+        let inLimit = true;
+
+        //  If this is the first time called, we must do the time intensive read from cache
+        //  to get the current api call count for each period we have limits for.
+        if (this.periodKeys.length === 0) {
+            [this.periodKeys, this.periodCount] = SiteThrottle.getCurrentThresholds(this.thresholds, this.siteID);
+        }
+
+        //  Will we exceed any thresholds?
+        for (let i = 0; i < this.thresholds.length; i++) {
+            inLimit = this.periodCount[i] + 1 < this.thresholds[i].maxPerPeriod;
+
+            if (!inLimit) {
+                Logger.log(`Throttle Limit EXCEEDED. ${this.siteID}`);
+                break;
+            }
+        }
+
+        //  If we don't exceed the throttle limits, increment all threshold counters.
+        if (inLimit) {
+            for (let i = 0; i < this.periodCount.length; i++) {
+                this.periodCount[i]++;
+            }
+        }
+
+        return inLimit;
+    }
+
+    static getCurrentThresholds(thresholds, siteID) {
+        let key = "";
+        let current = 0;
+        const keys = [];
+        const limits = [];
+
+        for (const period of thresholds) {
+            switch (period.periodName) {
+                case "SECOND":
+                    key = SiteThrottle.createSecondKey(siteID);
+                    current = SiteThrottle.currentForSecond(key);
+                    Logger.log(`SECOND Check.  key=${key}. Current=${current.toString()}.`);
+                    break;
+
+                case "MINUTE":
+                    key = SiteThrottle.createMinuteKey(siteID);
+                    current = SiteThrottle.currentForMinute(key);
+                    Logger.log(`MINUTE Check.  key=${key}. Current=${current.toString()}.`);
+                    break;
+
+                case "DAY":
+                    key = SiteThrottle.createDayKey(siteID);
+                    current = SiteThrottle.currentForDay(key);
+                    Logger.log(`DAY Check.  key=${key}. Current=${current.toString()}.`);
+
+                    break;
+
+                default:
+                    throw new Error(`Invalid threshold period ${period.periodName}`);
+            }
+
+            //  We save the KEY because it may change before we increment.
+            //  We save the current value because re-reading is very time consuming.
+            keys.push(key);
+            limits.push(current);
+        }
+
+        return [keys, limits];
+    }
+
+    //  At the end of a batch URL fetch, the THROTTLE stats need to be 
+    //  saved to cache.
+    update() {
+        if (this.periodKeys.length === 0) {
+            //  Was never used for this site.
+            return;
+        }
+
+        for (let i = 0; i < this.thresholds.length; i++) {
+            const period = this.thresholds[i];
+            switch (period.periodName) {
+                case "SECOND":
+                    SiteThrottle.updateForSecond(this.periodKeys[i], this.periodCount[i]);
+                    break;
+
+                case "MINUTE":
+                    SiteThrottle.updateForMinute(this.periodKeys[i], this.periodCount[i]);
+                    break;
+
+                case "DAY":
+                    SiteThrottle.updateForDay(this.periodKeys[i], this.periodCount[i]);
+                    break;
+
+                default:
+                    throw new Error(`Invalid threshold period ${period.periodName}`);
+            }
+        }
+
+        this.periodKeys = [];
+        this.periodCount = [];
+    }
+
+    /**
+     * 
+     * @param {String} key 
+     * @returns {Number}
+     */
+    static currentForSecond(key) {
+        const shortCache = CacheService.getScriptCache();
+        let data = shortCache.get(key);
+
+        return data === null ? 0 : JSON.parse(data);            
+    }
+
+    /**
+     * Current number of requests in THIS minute.  
+     * @param {String} key
+     * @returns {Number}
+     */
+    static currentForMinute(key) {
+        const shortCache = CacheService.getScriptCache();
+        let data = shortCache.get(key);
+
+        return data === null ? 0 : JSON.parse(data);
+    }
+
+    /**
+     * 
+     * @param {String} key 
+     * @param {Number} current 
+     */
+    static updateForSecond(key, current) {
+        const shortCache = CacheService.getScriptCache();
+        shortCache.put(key, JSON.stringify(current), 10);        
+    }
+
+    /**
+     * Add to minute counter.
+     * @param {String} key 
+     * @param {Number} current 
+     */
+    static updateForMinute(key, current) {
+        const shortCache = CacheService.getScriptCache();
+        shortCache.put(key, JSON.stringify(current), 180);
+    }
+
+    /**
+     * @param {String} key 
+     * @param {Number} current 
+     */
+    static updateForDay(key, current) {
+        const longCache = new ScriptSettings();
+        longCache.put(key, current, 2);
+    }
+
+    /**
+     * Current requests made for the day.
+     * @param {String} key 
+     * @returns {Number}
+     */
+    static currentForDay(key) {
+        const longCache = new ScriptSettings();
+        let data = longCache.get(key);
+
+        return data === null ? 0 : data;
+    }
+
+    /**
+     * 
+     * @param {String} siteID 
+     * @param {String} intervalName 
+     * @param {any} periodNumber - (0-59 -> MINUTE), (0-6 -> DAY) 
+     * @returns 
+     */
+    static makeKey(siteID, intervalName, periodNumber) {
+        return `${siteID}:${intervalName}:${periodNumber.toString()}`;
+    }
+
+    /**
+     * 
+     * @param {String} siteID 
+     * @returns {String}
+     */
+    static createSecondKey(siteID) {
+        const today = new Date();
+        const second = today.getSeconds();
+
+        return SiteThrottle.makeKey(siteID, "SEC", second);        
+    }
+
+    /**
+     * 
+     * @param {String} siteID 
+     * @returns {String}
+     */
+    static createMinuteKey(siteID) {
+        const today = new Date();
+        const minute = today.getMinutes();
+
+        return SiteThrottle.makeKey(siteID, "MIN", minute);
+    }
+
+    /**
+     * 
+     * @param {String} siteID 
+     * @returns {String}
+     */
+    static createDayKey(siteID) {
+        const today = new Date();
+        const dayNum = today.getDay();      // Day of the week. 0-6
+        return SiteThrottle.makeKey(siteID, "DAY", dayNum);
+    }
+}
+
+class ThresholdPeriod {
+    constructor(periodName, maxPerPeriod) {
+        this._periodName = periodName;
+        this._maxPerPeriod = maxPerPeriod;
+    }
+
+    get periodName() {
+        return this._periodName;
+    }
+    set periodName(val) {
+        this._periodName = val;
+    }
+    get maxPerPeriod() {
+        return this._maxPerPeriod;
+    }
+    set maxPerPeriod(val) {
+        this._maxPerPeriod = val;
     }
 }
 
