@@ -23,7 +23,7 @@
 * **CACHEFINANCES** is a custom function similar to **CACHEFINANCE** except it is used to process a range of symbols.
 * Valid **STOCK** data is always available even when GOOGLEFINANCE refuses to work.
 * GOOGLEFINANCE does not support all stock symbols.  Many unsupported google stocks can still get price/name/yield data (using web screen scraping).
-* GOOGLEFINANCE does not support many currency conversions.  CACHEFINANCE will lookup any failing currency conversions if GOOGLEFINANCE fails (strangely, I am pulling this data from the google finance web site - which works most of the time)
+* GOOGLEFINANCE does not support all currency conversions.  CACHEFINANCE will lookup any failing currency conversions if GOOGLEFINANCE fails (strangely, I am pulling this data from the google finance web site - which works most of the time)
 * As you can guess from the name, data is cached so when '#N/A' appears, it uses the last known value so that it does not mess up your asset history logging/graphing.
 * [All My Google Sheets Work](https://demmings.github.io/index.html)
 * [CacheFinance Web site](https://demmings.github.io/notes/cachefinance.html)
@@ -65,8 +65,14 @@
     * **AlphaVantage**
       * Click on **Edit Script Properties** ==> **Add Script Property**.  
         * Set the property name to:  **ALPHA_VANTAGE_API_KEY**
-        * Set the value to:  *'YOUR ALPHA_VANTAGE_API_KEY'*
+        * Set the value to:  *'YOUR Alpha Vantage API Key'*
           * Get your API key at:  https://www.alphavantage.co/
+    * **TwelveData**
+      * Click on **Edit Script Properties** ==> **Add Script Property**.
+        * Set the property name to: **TWELVE_DATA_API_KEY**
+        * Set the value to:  *'YOUR Twelve Data API Key'*
+          * Get your API key at:  https://twelvedata.com/
+
 
 ## Using as a custom function.
 * The custom function **CACHEFINANCE** enhances the capabilities of GOOGLEFINANCE.
@@ -179,6 +185,7 @@
     * **static parseResponse(html, symbol, attribute)**
     * **static getTicker(symbol)**
     * **static getPropertyValue(key, defaultValue)**
+    * **static getThrottleObject()**
   * Add the new class link to be used into:  FinanceWebSites() class.
     * Ordering in the list is important.  Sites near the top are attempted before sites at the bottom of the list.  For example **AlphaVantage** is listed last because they have a very small limit on the number of calls permitted per day.
     * When a site fails (or does not support) your attribute lookup, it tries the next site in the list and the site that failed will not be tried again for a period of time.
@@ -383,7 +390,33 @@
 
         return symbol;
     }
+
 ```
+***
+* # **getThrottleObject()**
+
+```
+    /**
+     * Get an instance of the throttling object to query if the web limit would be exceeded.
+     * @returns {SiteThrottle}
+     */
+    static getThrottleObject()
+    {}
+```
+  * Return null for a web site that does not need throttling.
+  * Here is an example of what was done for Twelve Data:
+```
+    static getThrottleObject() {
+        //  Basic throttle check
+        const limits = [
+            new ThresholdPeriod("MINUTE", 8),
+            new ThresholdPeriod("DAY", 800)
+        ];
+
+        return new SiteThrottle("TWELVEDATA", limits);
+    }
+```
+
 ***
 * # **getPropertyValue()**
   * Future expansion.  Return "" for now.
