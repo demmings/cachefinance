@@ -2305,7 +2305,7 @@ class YahooApi {
             }
         }
         catch (ex) {
-            Logger.log("Failed to parse JSON: " + symbol);
+            Logger.log(`Failed to parse JSON: ${symbol}`);
         }
 
         return stockData;
