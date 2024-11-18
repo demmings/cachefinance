@@ -5,7 +5,7 @@ import { SiteThrottle, ThresholdPeriod } from "./CacheFinanceUtils.js";
 export { FinanceWebSites };
 export { StockAttributes };
 export { FinanceWebSite };
-export { TdMarketResearch, GlobeAndMail, YahooFinance, FinnHub, AlphaVantage, GoogleWebSiteFinance, TwelveData };
+export { TdMarketResearch, GlobeAndMail, YahooFinance, YahooApi, FinnHub, AlphaVantage, GoogleWebSiteFinance, TwelveData };
 
 class Logger {
     static log(msg) {
@@ -26,6 +26,7 @@ class FinanceWebSites {
      */
     constructor() {
         this.siteList = [
+            new FinanceWebSite("YahooApi", YahooApi),
             new FinanceWebSite("GoogleWebSiteFinance", GoogleWebSiteFinance),
             new FinanceWebSite("TDEtf", TdMarketsEtf),
             new FinanceWebSite("TDStock", TdMarketsStock),
@@ -515,6 +516,7 @@ class YahooFinance {
             html = UrlFetchApp.fetch(URL).getContentText();
         }
         catch (ex) {
+            Logger.log(`FAILED -> getInfo:  ${symbol}.  URL = ${URL}. Err=${ex.toString()}`);
             return new StockAttributes();
         }
 
@@ -631,6 +633,117 @@ class YahooFinance {
 
         }
         return modifiedSymbol;
+    }
+
+    /**
+     * getURL() will receive an instance of the throttling object to query if the limit would be exceeded.
+     * @returns {SiteThrottle}
+     */
+    static getThrottleObject() {
+        return null;
+    }
+}
+
+class YahooApi {
+    /**
+     * 
+     * @param {String} symbol 
+     * @param {String} attribute
+     * @returns {StockAttributes}
+     */
+    static getInfo(symbol, attribute) {
+        const URL = YahooApi.getURL(symbol, attribute);
+
+        let html = null;
+        try {
+            html = UrlFetchApp.fetch(URL).getContentText();
+        }
+        catch (ex) {
+            return new StockAttributes();
+        }
+
+        Logger.log(`getInfo:  ${symbol}.  URL = ${URL}`);
+
+        return YahooApi.parseResponse(html, symbol);
+    }
+
+    /**
+     * 
+     * @param {String} symbol 
+     * @param {String} attribute
+     * @returns {String}
+     */
+    static getURL(symbol, attribute) {
+        if (FinanceWebSites.getTickerCountryCode(symbol) === "fx") {
+            return "";
+        }
+
+        if (attribute !== "PRICE" && attribute !== "NAME") {
+            return "";
+        }
+
+        return `https://query1.finance.yahoo.com/v8/finance/chart/${YahooApi.getTicker(symbol)}`;
+    }
+
+    /**
+     * 
+     * @returns {String}
+     */
+    static getApiKey() {
+        return "";
+    }
+
+    /**
+     * 
+     * @param {String} html 
+     * @param {String} symbol
+     * @returns {StockAttributes}
+     */
+    static parseResponse(html, symbol) {
+        const stockData = new StockAttributes();
+
+        if (symbol === '') {
+            return stockData;
+        }
+
+        try {
+            const data = JSON.parse(html);
+            if (data?.chart?.result.length > 0) {
+                const regularMarketPrice = data.chart.result[0].meta.regularMarketPrice;
+
+                stockData.stockPrice = parseFloat(regularMarketPrice);
+
+                if (isNaN(stockData.stockPrice)) {
+                    stockData.stockPrice = null;
+                }
+
+                stockData.stockName = data.chart.result[0].meta.longName;
+            }
+        }
+        catch (ex) {
+            Logger.log("Failed to parse JSON: " + symbol);
+        }
+
+        return stockData;
+    }
+
+    /**
+     * 
+     * @param {String} key 
+     * @param {any} defaultValue 
+     * @returns {any}
+     */
+    static getPropertyValue(key, defaultValue) {
+        return defaultValue;
+    }
+
+    /**
+     * 
+     * @param {String} symbol 
+     * @returns {String}
+     */
+    static getTicker(symbol) {
+        return YahooFinance.getTicker(symbol);
     }
 
     /**

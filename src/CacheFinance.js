@@ -14,13 +14,12 @@ class Logger {
         console.log(msg);
     }
 }
-//  *** DEBUG END ***/
 
 //  Function only used for testing in google sheets app script.
 // skipcq: JS-0128
 function testYieldPct() {
     const val = CACHEFINANCE("TSE:CJP", "yieldpct");        // skipcq: JS-0128
-    Logger.log(`Test CacheFinance FTN-A(yieldpct)=${val}`);
+    Logger.log(`Test CacheFinance TSE:CJP(yieldpct)=${val}`);
 }
 
 function testCacheFinances() {                                  // skipcq: JS-0128
@@ -33,6 +32,17 @@ function testCacheFinances() {                                  // skipcq: JS-01
 
     Logger.log(`BULK CACHE TEST Success${cacheData} . ${singleSymbols}`);
 }
+
+function testUpdateMaster() {
+    const symbols = ["TSE:ZTL", "TSE:FTN-A", "TSE:ZTL"];
+    const googleFinanceValues = [null, 10.0, null];
+    const symbolsWithNoData = ["TSE:ZTL"];
+    const thirdPartyFinanceValues = [15];
+
+    const newGoogleFinance = CacheFinance.updateMasterWithMissed(symbols, googleFinanceValues, symbolsWithNoData, thirdPartyFinanceValues);
+    Logger.log(newGoogleFinance);
+}
+//  *** DEBUG END ***/
 
 /**
  * Enhancement to GOOGLEFINANCE function for stock/ETF symbols that a) return "#N/A" (temporary or consistently), b) data never available like 'yieldpct' for ETF's. 
@@ -74,9 +84,9 @@ function CACHEFINANCE(symbol, attribute = "price", googleFinanceValue = "", cmdO
  * @customfunction
  */
 function CACHEFINANCES(symbols, attribute = "price", defaultValues = [], webSiteLookupCacheSeconds = -1) {         // skipcq: JS-0128
-    let isSingleLookup =  false;
-    if (!Array.isArray(symbols) && !Array.isArray(defaultValues) ) {
-        isSingleLookup =  true;
+    let isSingleLookup = false;
+    if (!Array.isArray(symbols) && !Array.isArray(defaultValues)) {
+        isSingleLookup = true;
         symbols = [[symbols]];
         defaultValues = [[defaultValues]];
     }
@@ -93,10 +103,10 @@ function CACHEFINANCES(symbols, attribute = "price", defaultValues = [], webSite
     const trimmedValues = CacheFinanceUtils.removeEmptyRecordsAtEndOfTable(defaultValues);
 
     //  Data ranges from sheets are double arrays.  Just make life simple and convert to single array.
-    let newSymbols = CacheFinanceUtils.convertRowsToSingleArray(trimmedSymbols);
+    const singleSymbols = CacheFinanceUtils.convertRowsToSingleArray(trimmedSymbols);
     const newValues = CacheFinanceUtils.convertRowsToSingleArray(trimmedValues);
 
-    newSymbols = newSymbols.map(sym => sym.toUpperCase());
+    const newSymbols = singleSymbols.map(sym => sym.toUpperCase());
     attribute = attribute.toUpperCase().trim();
 
     if (newSymbols.length === 0 || attribute === '') {
@@ -109,7 +119,7 @@ function CACHEFINANCES(symbols, attribute = "price", defaultValues = [], webSite
     if (isSingleLookup) {
         financeValues = financeValues[0][0];
     }
-    
+
     return financeValues;
 }
 
@@ -193,7 +203,7 @@ class CacheFinance {
             const val = CacheFinanceUtils.isValidGoogleValue(googleFinanceValues[i]) ? googleFinanceValues[i] : valueFromCache[i];
             updatedValues.push(val);
         }
-        
+
         return updatedValues;
     }
 
@@ -218,7 +228,10 @@ class CacheFinance {
      * @returns {String[]}
      */
     static getSymbolsWithNoValidData(symbols, googleFinanceValues) {
-        return symbols.filter((_sym, i) => !CacheFinanceUtils.isValidGoogleValue(googleFinanceValues[i]));
+        const noInfoSymbols = symbols.filter((_sym, i) => !CacheFinanceUtils.isValidGoogleValue(googleFinanceValues[i]));
+
+        // @ts-ignore
+        return [... new Set(noInfoSymbols)];
     }
 
     /**
@@ -227,18 +240,20 @@ class CacheFinance {
      * @param {any[]} googleFinanceValues 
      * @param {String[]} symbolsWithNoData 
      * @param {any[]} thirdPartyFinanceValues 
-     * @returns 
+     * @returns {any[]}
      */
     static updateMasterWithMissed(symbols, googleFinanceValues, symbolsWithNoData, thirdPartyFinanceValues) {
-        let startPos = 0;
-
         for (let i = 0; i < symbolsWithNoData.length; i++) {
-            const j = symbols.indexOf(symbolsWithNoData[i], startPos);
-            if (j !== -1) {
-                if (CacheFinanceUtils.isValidGoogleValue(thirdPartyFinanceValues[i])) {
-                    googleFinanceValues[j] = thirdPartyFinanceValues[i];
+            let startPos = 0;
+
+            while (startPos !== -1) {
+                startPos = symbols.indexOf(symbolsWithNoData[i], startPos);
+                if (startPos !== -1) {
+                    if (CacheFinanceUtils.isValidGoogleValue(thirdPartyFinanceValues[i])) {
+                        googleFinanceValues[startPos] = thirdPartyFinanceValues[i];
+                    }
+                    startPos++;
                 }
-                startPos = j;
             }
         }
 

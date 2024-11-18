@@ -1,22 +1,4 @@
 
-//  Function only used for testing in google sheets app script.
-// skipcq: JS-0128
-function testYieldPct() {
-    const val = CACHEFINANCE("TSE:CJP", "yieldpct");        // skipcq: JS-0128
-    Logger.log(`Test CacheFinance FTN-A(yieldpct)=${val}`);
-}
-
-function testCacheFinances() {                                  // skipcq: JS-0128
-    const symbols = SpreadsheetApp.getActiveSpreadsheet().getRangeByName("A30:A165").getValues();
-    const data = SpreadsheetApp.getActiveSpreadsheet().getRangeByName("E30:E165").getValues();
-
-    const cacheData = CACHEFINANCES(symbols, "PRICE", data);
-
-    const singleSymbols = CacheFinanceUtils.convertRowsToSingleArray(symbols);
-
-    Logger.log(`BULK CACHE TEST Success${cacheData} . ${singleSymbols}`);
-}
-
 /**
  * Enhancement to GOOGLEFINANCE function for stock/ETF symbols that a) return "#N/A" (temporary or consistently), b) data never available like 'yieldpct' for ETF's. 
  * @param {string} symbol - stock ticket with exchange (e.g.  "NYSEARCA:VOO")
@@ -57,9 +39,9 @@ function CACHEFINANCE(symbol, attribute = "price", googleFinanceValue = "", cmdO
  * @customfunction
  */
 function CACHEFINANCES(symbols, attribute = "price", defaultValues = [], webSiteLookupCacheSeconds = -1) {         // skipcq: JS-0128
-    let isSingleLookup =  false;
-    if (!Array.isArray(symbols) && !Array.isArray(defaultValues) ) {
-        isSingleLookup =  true;
+    let isSingleLookup = false;
+    if (!Array.isArray(symbols) && !Array.isArray(defaultValues)) {
+        isSingleLookup = true;
         symbols = [[symbols]];
         defaultValues = [[defaultValues]];
     }
@@ -76,10 +58,10 @@ function CACHEFINANCES(symbols, attribute = "price", defaultValues = [], webSite
     const trimmedValues = CacheFinanceUtils.removeEmptyRecordsAtEndOfTable(defaultValues);
 
     //  Data ranges from sheets are double arrays.  Just make life simple and convert to single array.
-    let newSymbols = CacheFinanceUtils.convertRowsToSingleArray(trimmedSymbols);
+    const singleSymbols = CacheFinanceUtils.convertRowsToSingleArray(trimmedSymbols);
     const newValues = CacheFinanceUtils.convertRowsToSingleArray(trimmedValues);
 
-    newSymbols = newSymbols.map(sym => sym.toUpperCase());
+    const newSymbols = singleSymbols.map(sym => sym.toUpperCase());
     attribute = attribute.toUpperCase().trim();
 
     if (newSymbols.length === 0 || attribute === '') {
@@ -92,7 +74,7 @@ function CACHEFINANCES(symbols, attribute = "price", defaultValues = [], webSite
     if (isSingleLookup) {
         financeValues = financeValues[0][0];
     }
-    
+
     return financeValues;
 }
 
@@ -176,7 +158,7 @@ class CacheFinance {
             const val = CacheFinanceUtils.isValidGoogleValue(googleFinanceValues[i]) ? googleFinanceValues[i] : valueFromCache[i];
             updatedValues.push(val);
         }
-        
+
         return updatedValues;
     }
 
@@ -201,7 +183,10 @@ class CacheFinance {
      * @returns {String[]}
      */
     static getSymbolsWithNoValidData(symbols, googleFinanceValues) {
-        return symbols.filter((_sym, i) => !CacheFinanceUtils.isValidGoogleValue(googleFinanceValues[i]));
+        const noInfoSymbols = symbols.filter((_sym, i) => !CacheFinanceUtils.isValidGoogleValue(googleFinanceValues[i]));
+
+        // @ts-ignore
+        return [... new Set(noInfoSymbols)];
     }
 
     /**
@@ -210,18 +195,20 @@ class CacheFinance {
      * @param {any[]} googleFinanceValues 
      * @param {String[]} symbolsWithNoData 
      * @param {any[]} thirdPartyFinanceValues 
-     * @returns 
+     * @returns {any[]}
      */
     static updateMasterWithMissed(symbols, googleFinanceValues, symbolsWithNoData, thirdPartyFinanceValues) {
-        let startPos = 0;
-
         for (let i = 0; i < symbolsWithNoData.length; i++) {
-            const j = symbols.indexOf(symbolsWithNoData[i], startPos);
-            if (j !== -1) {
-                if (CacheFinanceUtils.isValidGoogleValue(thirdPartyFinanceValues[i])) {
-                    googleFinanceValues[j] = thirdPartyFinanceValues[i];
+            let startPos = 0;
+
+            while (startPos !== -1) {
+                startPos = symbols.indexOf(symbolsWithNoData[i], startPos);
+                if (startPos !== -1) {
+                    if (CacheFinanceUtils.isValidGoogleValue(thirdPartyFinanceValues[i])) {
+                        googleFinanceValues[startPos] = thirdPartyFinanceValues[i];
+                    }
+                    startPos++;
                 }
-                startPos = j;
             }
         }
 
@@ -1388,7 +1375,8 @@ class CacheFinanceTest {
         this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "NYSEARCA:VOO");
         this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "TSE:RY");
         this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "NASDAQ:VTC");
-        
+        this.cacheTestRun.run("YahooApi", YahooApi.getInfo, "NASDAQ:VTC", "PRICE");
+
         this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "NYSEARCA:SHYG");
         this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:ZTL");
         this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:RY", "ALL", "STOCK");
@@ -1433,7 +1421,7 @@ class CacheFinanceTestRun {
             /** @type {StockAttributes} */
             let data = func(symbol, attribute, type);
 
-            if (! (data instanceof StockAttributes)) {
+            if (!(data instanceof StockAttributes)) {
                 const myData = new StockAttributes;
                 if (attribute === "PRICE") {
                     myData.stockPrice = data;
@@ -1450,14 +1438,14 @@ class CacheFinanceTestRun {
                 result.setStatus("Not Found!")
             }
         }
-        catch(ex) {
+        catch (ex) {
             result.setStatus(`Error: ${ex.toString()}`);
         }
         result.finishTimer();
 
         this.testRuns.push(result);
-    } 
-    
+    }
+
     /**
      * Return results for all tests.
      * @returns {any[][]}
@@ -1493,20 +1481,20 @@ class CacheFinanceTestRun {
  * @classdesc Individual test results and tracking.
  */
 class CacheFinanceTestStatus {
-    constructor (serviceName="", symbol="") {
+    constructor(serviceName = "", symbol = "") {
         this._serviceName = serviceName;
         this._symbol = symbol;
         this._stockAttributes = new StockAttributes();
         this._startTime = Date.now()
         this._typeLookup = "";
-        this._attributeLookup  = "";
+        this._attributeLookup = "";
         this._runTime = 0;
     }
 
     get serviceName() {
         return this._serviceName;
     }
-    get symbol () {
+    get symbol() {
         return this._symbol;
     }
     get value() {
@@ -1622,6 +1610,7 @@ class FinanceWebSites {
      */
     constructor() {
         this.siteList = [
+            new FinanceWebSite("YahooApi", YahooApi),
             new FinanceWebSite("GoogleWebSiteFinance", GoogleWebSiteFinance),
             new FinanceWebSite("TDEtf", TdMarketsEtf),
             new FinanceWebSite("TDStock", TdMarketsStock),
@@ -2111,6 +2100,7 @@ class YahooFinance {
             html = UrlFetchApp.fetch(URL).getContentText();
         }
         catch (ex) {
+            Logger.log(`FAILED -> getInfo:  ${symbol}.  URL = ${URL}. Err=${ex.toString()}`);
             return new StockAttributes();
         }
 
@@ -2227,6 +2217,117 @@ class YahooFinance {
 
         }
         return modifiedSymbol;
+    }
+
+    /**
+     * getURL() will receive an instance of the throttling object to query if the limit would be exceeded.
+     * @returns {SiteThrottle}
+     */
+    static getThrottleObject() {
+        return null;
+    }
+}
+
+class YahooApi {
+    /**
+     * 
+     * @param {String} symbol 
+     * @param {String} attribute
+     * @returns {StockAttributes}
+     */
+    static getInfo(symbol, attribute) {
+        const URL = YahooApi.getURL(symbol, attribute);
+
+        let html = null;
+        try {
+            html = UrlFetchApp.fetch(URL).getContentText();
+        }
+        catch (ex) {
+            return new StockAttributes();
+        }
+
+        Logger.log(`getInfo:  ${symbol}.  URL = ${URL}`);
+
+        return YahooApi.parseResponse(html, symbol);
+    }
+
+    /**
+     * 
+     * @param {String} symbol 
+     * @param {String} attribute
+     * @returns {String}
+     */
+    static getURL(symbol, attribute) {
+        if (FinanceWebSites.getTickerCountryCode(symbol) === "fx") {
+            return "";
+        }
+
+        if (attribute !== "PRICE" && attribute !== "NAME") {
+            return "";
+        }
+
+        return `https://query1.finance.yahoo.com/v8/finance/chart/${YahooApi.getTicker(symbol)}`;
+    }
+
+    /**
+     * 
+     * @returns {String}
+     */
+    static getApiKey() {
+        return "";
+    }
+
+    /**
+     * 
+     * @param {String} html 
+     * @param {String} symbol
+     * @returns {StockAttributes}
+     */
+    static parseResponse(html, symbol) {
+        const stockData = new StockAttributes();
+
+        if (symbol === '') {
+            return stockData;
+        }
+
+        try {
+            const data = JSON.parse(html);
+            if (data?.chart?.result.length > 0) {
+                const regularMarketPrice = data.chart.result[0].meta.regularMarketPrice;
+
+                stockData.stockPrice = parseFloat(regularMarketPrice);
+
+                if (isNaN(stockData.stockPrice)) {
+                    stockData.stockPrice = null;
+                }
+
+                stockData.stockName = data.chart.result[0].meta.longName;
+            }
+        }
+        catch (ex) {
+            Logger.log("Failed to parse JSON: " + symbol);
+        }
+
+        return stockData;
+    }
+
+    /**
+     * 
+     * @param {String} key 
+     * @param {any} defaultValue 
+     * @returns {any}
+     */
+    static getPropertyValue(key, defaultValue) {
+        return defaultValue;
+    }
+
+    /**
+     * 
+     * @param {String} symbol 
+     * @returns {String}
+     */
+    static getTicker(symbol) {
+        return YahooFinance.getTicker(symbol);
     }
 
     /**

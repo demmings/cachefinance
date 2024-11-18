@@ -1,7 +1,7 @@
 /*  *** DEBUG START ***
 //  Remove comments for testing in NODE
 
-import { TdMarketResearch, GlobeAndMail, YahooFinance, GoogleWebSiteFinance, FinnHub, AlphaVantage, TwelveData, StockAttributes } from "./CacheFinanceWebSites.js";
+import { TdMarketResearch, GlobeAndMail, YahooFinance, YahooApi, GoogleWebSiteFinance, FinnHub, AlphaVantage, TwelveData, StockAttributes } from "./CacheFinanceWebSites.js";
 import { ThirdPartyFinance, FinanceWebsiteSearch } from "./CacheFinance3rdParty.js";
 import { CACHEFINANCE, CacheFinance } from "./CacheFinance.js";
 export { cacheFinanceTest };
@@ -39,7 +39,8 @@ class CacheFinanceTest {
         this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "NYSEARCA:VOO");
         this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "TSE:RY");
         this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "NASDAQ:VTC");
-        
+        this.cacheTestRun.run("YahooApi", YahooApi.getInfo, "NASDAQ:VTC", "PRICE");
+
         this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "NYSEARCA:SHYG");
         this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:ZTL");
         this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:RY", "ALL", "STOCK");
@@ -84,7 +85,7 @@ class CacheFinanceTestRun {
             /** @type {StockAttributes} */
             let data = func(symbol, attribute, type);
 
-            if (! (data instanceof StockAttributes)) {
+            if (!(data instanceof StockAttributes)) {
                 const myData = new StockAttributes;
                 if (attribute === "PRICE") {
                     myData.stockPrice = data;
@@ -101,14 +102,14 @@ class CacheFinanceTestRun {
                 result.setStatus("Not Found!")
             }
         }
-        catch(ex) {
+        catch (ex) {
             result.setStatus(`Error: ${ex.toString()}`);
         }
         result.finishTimer();
 
         this.testRuns.push(result);
-    } 
-    
+    }
+
     /**
      * Return results for all tests.
      * @returns {any[][]}
@@ -144,20 +145,20 @@ class CacheFinanceTestRun {
  * @classdesc Individual test results and tracking.
  */
 class CacheFinanceTestStatus {
-    constructor (serviceName="", symbol="") {
+    constructor(serviceName = "", symbol = "") {
         this._serviceName = serviceName;
         this._symbol = symbol;
         this._stockAttributes = new StockAttributes();
         this._startTime = Date.now()
         this._typeLookup = "";
-        this._attributeLookup  = "";
+        this._attributeLookup = "";
         this._runTime = 0;
     }
 
     get serviceName() {
         return this._serviceName;
     }
-    get symbol () {
+    get symbol() {
         return this._symbol;
     }
     get value() {
