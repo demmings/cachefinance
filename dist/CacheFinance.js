@@ -1604,9 +1604,8 @@ class CacheFinanceTestStatus {
 class FinanceWebSites {
     /**
      * All finance website lookup objects should be defined here.
-     * All finance Website Objects must implement the method "getInfo(symbol)" and getPropertyValue(key)
+     * All finance Website Objects must implement the method "getInfo(symbol)" 
      * The getInfo() method must return an instance of "StockAttributes"
-     * The getPropertyValue() is used to query any possible properties known (and unknown future) about the website.
      */
     constructor() {
         this.siteList = [
@@ -1883,16 +1882,6 @@ class TdMarketsEtf {
     }
 
     /**
-     * 
-     * @param {String} key 
-     * @param {any} defaultValue 
-     * @returns {any}
-     */
-    static getPropertyValue(key, defaultValue) {
-        return defaultValue;
-    }
-
-    /**
      * getURL() will receive an instance of the throttling object to query if the limit would be exceeded.
      * @returns {SiteThrottle}
      */
@@ -1941,16 +1930,6 @@ class TdMarketsStock {
       */
     static parseResponse(html, _symbol) {
         return TdMarketResearch.parseResponse(html);
-    }
-
-    /**
-     * 
-     * @param {String} key 
-     * @param {any} defaultValue 
-     * @returns {any}
-     */
-    static getPropertyValue(key, defaultValue) {
-        return defaultValue;
     }
 
     /**
@@ -2189,16 +2168,6 @@ class YahooFinance {
 
     /**
      * 
-     * @param {String} key 
-     * @param {any} defaultValue 
-     * @returns {any}
-     */
-    static getPropertyValue(key, defaultValue) {
-        return defaultValue;
-    }
-
-    /**
-     * 
      * @param {String} symbol 
      * @returns {String}
      */
@@ -2313,16 +2282,6 @@ class YahooApi {
 
     /**
      * 
-     * @param {String} key 
-     * @param {any} defaultValue 
-     * @returns {any}
-     */
-    static getPropertyValue(key, defaultValue) {
-        return defaultValue;
-    }
-
-    /**
-     * 
      * @param {String} symbol 
      * @returns {String}
      */
@@ -2428,16 +2387,6 @@ class GlobeAndMail {
         }
 
         return data;
-    }
-
-    /**
-     * 
-     * @param {String} key 
-     * @param {any} defaultValue 
-     * @returns {any}
-     */
-    static getPropertyValue(key, defaultValue) {
-        return defaultValue;
     }
 
     /**
@@ -2579,16 +2528,6 @@ class FinnHub {
     }
 
     /**
-     * 
-     * @param {String} key 
-     * @param {any} defaultValue 
-     * @returns {any}
-     */
-    static getPropertyValue(key, defaultValue) {
-        return defaultValue;
-    }
-
-    /**
      * getURL() will receive an instance of the throttling object to query if the limit would be exceeded.
      * @returns {SiteThrottle}
      */
@@ -2710,16 +2649,6 @@ class AlphaVantage {
         }
 
         return data;
-    }
-
-    /**
-     * 
-     * @param {String} key 
-     * @param {any} defaultValue 
-     * @returns {any}
-     */
-    static getPropertyValue(key, defaultValue) {
-        return defaultValue;
     }
 
     /**
@@ -2890,16 +2819,6 @@ class GoogleWebSiteFinance {
 
     /**
      * 
-     * @param {String} key 
-     * @param {any} defaultValue 
-     * @returns {any}
-     */
-    static getPropertyValue(key, defaultValue) {
-        return defaultValue;
-    }
-
-    /**
-     * 
      * @param {String} symbol 
      * @returns {String}
      */
@@ -3048,17 +2967,6 @@ class TwelveData {
 
         return data;
     }
-
-    /**
-     * 
-     * @param {String} key 
-     * @param {any} defaultValue 
-     * @returns {any}
-     */
-    static getPropertyValue(key, defaultValue) {
-        return defaultValue;
-    }
-
 
     /**
      * Get an instance of the throttling object to query if the web limit would be exceeded.
