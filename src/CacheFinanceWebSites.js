@@ -90,6 +90,7 @@ class FinanceWebSites {
             case "TSE":
             case "TSX":
             case "TSXV":
+            case "NEO":
                 countryCode = "ca";
                 break;
             case "SGX":
@@ -241,7 +242,9 @@ class StockAttributes {
     isAttributeSet(attribute) {
         switch (attribute) {
             case "PRICE":
-                return this.stockPrice !== null && this.stockPrice !== 0;
+                const retVal = this.stockPrice !== null && !isNaN(this.stockPrice) && this.stockPrice !== 0;
+                Logger.log("price=" + this.stockPrice + ". Is Valid=" + retVal);
+                return retVal;
 
             case "YIELDPCT":
                 return this.yieldPct !== null;
@@ -599,6 +602,8 @@ class YahooFinance {
                 modifiedSymbol = `${symbolParts[1]}.TO`;
             if (symbolParts[0] === "SGX")
                 modifiedSymbol = `${symbolParts[1]}.SI`;
+            if (symbolParts[0] === "NEO")
+                modifiedSymbol = `${symbolParts[1]}.NE`;
 
         }
         return modifiedSymbol;
@@ -827,6 +832,9 @@ class GlobeAndMail {
                         symbol = `${prefShare[0]}-PR-${prefShare[1]}`;
                     }
                     symbol = `${symbol}-T`;
+                    break;
+                case "NEO":
+                    symbol = `${parts[1]}-NE`;
                     break;
                 case "NYSEARCA":
                     symbol = `${parts[1]}-A`;

@@ -1373,19 +1373,19 @@ class CacheFinanceTest {
      */
     execute() {
         this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "NYSEARCA:VOO");
-        this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "TSE:RY");
-        this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "NASDAQ:VTC");
+        this.cacheTestRun.run("Yahoo", YahooFinance.getInfo, "NEO:CJP");
         this.cacheTestRun.run("YahooApi", YahooApi.getInfo, "NASDAQ:VTC", "PRICE");
+        this.cacheTestRun.run("YahooApi", YahooApi.getInfo, "NEO:CJP", "PRICE");
 
         this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "NYSEARCA:SHYG");
-        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:ZTL");
+        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "NEO:CJP");
         this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:RY", "ALL", "STOCK");
 
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "NYSEARCA:VOO");
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:FTN-A");
-        this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:RY");
+        this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "NEO:CJP");
 
-        this.cacheTestRun.run("GoogleWebSiteFinance", GoogleWebSiteFinance.getInfo, "TSE:RY");
+        this.cacheTestRun.run("GoogleWebSiteFinance", GoogleWebSiteFinance.getInfo, "NEO:CJP");
 
         this.cacheTestRun.run("Finnhub", FinnHub.getInfo, "NYSEARCA:VOO", "PRICE");
         this.cacheTestRun.run("AlphaVantage", AlphaVantage.getInfo, "NYSEARCA:VOO", "PRICE");
@@ -1674,6 +1674,7 @@ class FinanceWebSites {
             case "TSE":
             case "TSX":
             case "TSXV":
+            case "NEO":
                 countryCode = "ca";
                 break;
             case "SGX":
@@ -1825,7 +1826,9 @@ class StockAttributes {
     isAttributeSet(attribute) {
         switch (attribute) {
             case "PRICE":
-                return this.stockPrice !== null && this.stockPrice !== 0;
+                const retVal = this.stockPrice !== null && !isNaN(this.stockPrice) && this.stockPrice !== 0;
+                Logger.log("price=" + this.stockPrice + ". Is Valid=" + retVal);
+                return retVal;
 
             case "YIELDPCT":
                 return this.yieldPct !== null;
@@ -2183,6 +2186,8 @@ class YahooFinance {
                 modifiedSymbol = `${symbolParts[1]}.TO`;
             if (symbolParts[0] === "SGX")
                 modifiedSymbol = `${symbolParts[1]}.SI`;
+            if (symbolParts[0] === "NEO")
+                modifiedSymbol = `${symbolParts[1]}.NE`;
 
         }
         return modifiedSymbol;
@@ -2411,6 +2416,9 @@ class GlobeAndMail {
                         symbol = `${prefShare[0]}-PR-${prefShare[1]}`;
                     }
                     symbol = `${symbol}-T`;
+                    break;
+                case "NEO":
+                    symbol = `${parts[1]}-NE`;
                     break;
                 case "NYSEARCA":
                     symbol = `${parts[1]}-A`;
