@@ -1826,9 +1826,11 @@ class StockAttributes {
     isAttributeSet(attribute) {
         switch (attribute) {
             case "PRICE":
-                const retVal = this.stockPrice !== null && !isNaN(this.stockPrice) && this.stockPrice !== 0;
-                Logger.log("price=" + this.stockPrice + ". Is Valid=" + retVal);
-                return retVal;
+                {
+                    const retVal = this.stockPrice !== null && !isNaN(this.stockPrice) && this.stockPrice !== 0;
+                    Logger.log(`price=${this.stockPrice}. Is Valid=${retVal}`);
+                    return retVal;
+                }
 
             case "YIELDPCT":
                 return this.yieldPct !== null;
