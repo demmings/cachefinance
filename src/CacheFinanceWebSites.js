@@ -321,7 +321,7 @@ class YahooFinance {
             return data;
         }
         
-        const percentReg = new RegExp(`title=\"Yield\">Yield\<\/span> <[^>]*\>(\\d{0,5}\.?\\d{0,4})?`);
+        const percentReg = new RegExp('title=\"Yield\">Yield\<\/span> <[^>]*\>(\\d{0,5}\.?\\d{0,4})?');
         let dividendPercent = html.match(percentReg);
         Logger.log("Regex %=" + percentReg);
         
@@ -337,7 +337,7 @@ class YahooFinance {
         }
 
         const baseSymbol = YahooFinance.getTicker(symbol);
-        const re = new RegExp(`qsp-price"\>(\\d{0,5}\.?\\d{0,4})?`);
+        const re = new RegExp('qsp-price"\>(\\d{0,5}\.?\\d{0,4})?');
 
         const priceMatch = html.match(re);
         Logger.log("yahoo price match=" + re);
