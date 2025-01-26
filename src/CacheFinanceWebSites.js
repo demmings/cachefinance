@@ -321,9 +321,9 @@ class YahooFinance {
             return data;
         }
         
+        // const percentReg = new RegExp('title="Yield">Yield<\/span> <[^>]*>(\\d{0,5}\.?\\d{0,4})?');
         //  skipcq:  JS-0097
-        const percentReg = new RegExp('title="Yield">Yield<\/span> <[^>]*>(\\d{0,5}\.?\\d{0,4})?');
-        let dividendPercent = html.match(percentReg);
+        let dividendPercent = html.match('title="Yield">Yield</span> <[^>]*>(\\d{0,5}\.?\\d{0,4})?');
         
         if (dividendPercent !== null && dividendPercent.length === 2) {
             const tempPct = dividendPercent[1];
@@ -337,9 +337,9 @@ class YahooFinance {
         }
 
         const baseSymbol = YahooFinance.getTicker(symbol);
+        // const re = new RegExp('qsp-price">(\\d{0,5}\.?\\d{0,4})?');
         //  skipcq:  JS-0097
-        const re = new RegExp('qsp-price">(\\d{0,5}\.?\\d{0,4})?');
-        const priceMatch = html.match(re);
+        const priceMatch = html.match('qsp-price">(\\d{0,5}\.?\\d{0,4})?');
 
         if (priceMatch !== null && priceMatch.length === 2) {
             const tempPrice = priceMatch[1];
