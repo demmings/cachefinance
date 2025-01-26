@@ -1377,15 +1377,12 @@ class CacheFinanceTest {
         this.cacheTestRun.run("YahooApi", YahooApi.getInfo, "NASDAQ:VTC", "PRICE");
         this.cacheTestRun.run("YahooApi", YahooApi.getInfo, "NEO:CJP", "PRICE");
 
-        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "NYSEARCA:SHYG");
-        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "NEO:CJP");
-        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:RY", "ALL", "STOCK");
-
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "NYSEARCA:VOO");
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:FTN-A");
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "NEO:CJP");
 
         this.cacheTestRun.run("GoogleWebSiteFinance", GoogleWebSiteFinance.getInfo, "NEO:CJP");
+        this.cacheTestRun.run("GoogleWebSiteFinance", GoogleWebSiteFinance.getInfo, "NYSEARCA:VOO");
 
         this.cacheTestRun.run("Finnhub", FinnHub.getInfo, "NYSEARCA:VOO", "PRICE");
         this.cacheTestRun.run("AlphaVantage", AlphaVantage.getInfo, "NYSEARCA:VOO", "PRICE");
@@ -1611,8 +1608,6 @@ class FinanceWebSites {
         this.siteList = [
             new FinanceWebSite("YahooApi", YahooApi),
             new FinanceWebSite("GoogleWebSiteFinance", GoogleWebSiteFinance),
-            new FinanceWebSite("TDEtf", TdMarketsEtf),
-            new FinanceWebSite("TDStock", TdMarketsStock),
             new FinanceWebSite("FinnHub", FinnHub),
             new FinanceWebSite("Globe", GlobeAndMail),
             new FinanceWebSite("Yahoo", YahooFinance),
@@ -1844,227 +1839,6 @@ class StockAttributes {
     }
 }
 
-/**
- * @classdesc TD Markets lookup by ETF symbol
- */
-class TdMarketsEtf {
-    /**
-     * 
-     * @param {String} symbol 
-     * @param {String} attribute
-     * @returns {StockAttributes}
-     */
-    static getInfo(symbol, attribute) {
-        return TdMarketResearch.getInfo(symbol, attribute, "ETF");
-    }
-
-    /**
-     * 
-     * @param {String} symbol 
-     * @param {String} _attribute
-     * @returns {String}
-     */
-    static getURL(symbol, _attribute) {
-        return TdMarketResearch.getURL(symbol, "ETF");
-    }
-
-    /**
-     * 
-     * @returns {String}
-     */
-    static getApiKey() {
-        return "";
-    }
-
-    /**
-      * 
-      * @param {String} html 
-      * @param {String} _symbol
-      * @returns {StockAttributes}
-      */
-    static parseResponse(html, _symbol) {
-        return TdMarketResearch.parseResponse(html);
-    }
-
-    /**
-     * getURL() will receive an instance of the throttling object to query if the limit would be exceeded.
-     * @returns {SiteThrottle}
-     */
-    static getThrottleObject() {
-        return null;
-    }
-}
-
-/**
- * @classdesc TD Markets lookup by STOCK symbol
- */
-class TdMarketsStock {
-    /**
-     * 
-     * @param {String} symbol 
-     * @param {String} attribute
-     * @returns {StockAttributes}
-     */
-    static getInfo(symbol, attribute) {
-        return TdMarketResearch.getInfo(symbol, attribute, "STOCK");
-    }
-
-    /**
-     * 
-     * @param {String} symbol 
-     * @param {String} _attribute
-     * @returns {String}
-     */
-    static getURL(symbol, _attribute) {
-        return TdMarketResearch.getURL(symbol, "STOCK");
-    }
-
-    /**
-     * 
-     * @returns {String}
-     */
-    static getApiKey() {
-        return "";
-    }
-
-    /**
-      * 
-      * @param {String} html 
-      * @param {String} _symbol
-      * @returns {StockAttributes}
-      */
-    static parseResponse(html, _symbol) {
-        return TdMarketResearch.parseResponse(html);
-    }
-
-    /**
-     * getURL() will receive an instance of the throttling object to query if the limit would be exceeded.
-     * @returns {SiteThrottle}
-     */
-    static getThrottleObject() {
-        return null;
-    }
-}
-
-/**
- * @classdesc Base class to Lookup for TD website.
- */
-class TdMarketResearch {
-    /**
-     * 
-     * @param {String} symbol 
-     * @param {String} _attribute
-     * @param {String} type 
-     * @returns {StockAttributes}
-     */
-    static getInfo(symbol, _attribute, type = "ETF") {
-        const URL = TdMarketResearch.getURL(symbol, type);
-
-        let html = null;
-        try {
-            html = UrlFetchApp.fetch(URL).getContentText();
-        }
-        catch (ex) {
-            return new StockAttributes();
-        }
-        Logger.log(`getInfo:  ${symbol}.  URL = ${URL}`);
-
-        return TdMarketResearch.parseResponse(html);
-    }
-
-    /**
-     * 
-     * @param {String} symbol 
-     * @param {String} type 
-     * @returns {String}
-     */
-    static getURL(symbol, type = "ETF") {
-        let URL = "";
-
-        if (FinanceWebSites.getTickerCountryCode(symbol) === "fx") {
-            return URL;
-        }
-
-        if (type === "ETF")
-            URL = `https://marketsandresearch.td.com/tdwca/Public/ETFsProfile/Summary/${FinanceWebSites.getTickerCountryCode(symbol)}/${TdMarketResearch.getTicker(symbol)}`;
-        else
-            URL = `https://marketsandresearch.td.com/tdwca/Public/Stocks/Overview/${FinanceWebSites.getTickerCountryCode(symbol)}/${TdMarketResearch.getTicker(symbol)}`;
-
-        return URL;
-    }
-
-    /**
-     * 
-     * @param {String} html 
-     * @returns {StockAttributes}
-     */
-    static parseResponse(html) {
-        const data = new StockAttributes();
-
-        //  Get the dividend yield.
-
-        let parts = html.match(/Dividend Yield<\/th><td class="last">(\d{0,4}\.?\d{0,4})%/);
-        if (parts === null) {
-            parts = html.match(/Dividend Yield<\/div>.*?cell-container contains">(\d{0,4}\.?\d{0,4})%/);
-        }
-        if (parts !== null && parts.length === 2) {
-            const tempPct = parts[1];
-
-            const parsedValue = parseFloat(tempPct) / 100;
-
-            if (!isNaN(parsedValue)) {
-                data.yieldPct = parsedValue;
-            }
-        }
-
-        //  Get the name.
-        parts = html.match(/.<span class="issueName">(.*?)<\//);
-        if (parts !== null && parts.length === 2) {
-            data.stockName = parts[1];
-        }
-
-        //  Get the price.
-        parts = html.match(/.LAST PRICE<\/span><div><span>(\d{0,4}\.?\d{0,4})</);
-        if (parts !== null && parts.length === 2) {
-
-            const parsedValue = parseFloat(parts[1]);
-            if (!isNaN(parsedValue)) {
-                data.stockPrice = parsedValue;
-            }
-        }
-
-        return data;
-    }
-
-    /**
-     * 
-     * @param {String} symbol 
-     * @returns {String}
-     */
-    static getTicker(symbol) {
-        const colon = symbol.indexOf(":");
-
-        if (colon >= 0) {
-            const parts = symbol.split(":");
-            symbol = parts[1];
-        }
-
-        const dash = symbol.indexOf("-");
-        if (dash >= 0) {
-            symbol = symbol.replace("-", ".PR.");
-        }
-
-        return symbol;
-    }
-
-    /**
-     * getURL() will receive an instance of the throttling object to query if the limit would be exceeded.
-     * @returns {SiteThrottle}
-     */
-    static getThrottleObject() {
-        return null;
-    }
-}
 
 /**
  * @classdesc Lookup for Yahoo site.
@@ -2127,12 +1901,11 @@ class YahooFinance {
         if (symbol === '') {
             return data;
         }
-
-        let dividendPercent = html.match(/Forward Dividend &amp; Yield.+?\((\d*\.\d*)%\)/);
-        if (dividendPercent === null) {
-            dividendPercent = html.match(/TD_YIELD-value">(\d*\.\d*)%/);
-        }
-
+        
+        const percentReg = new RegExp(`title=\"Yield\">Yield\<\/span> <[^>]*\>(\\d{0,5}\.?\\d{0,4})?`);
+        let dividendPercent = html.match(percentReg);
+        Logger.log("Regex %=" + percentReg);
+        
         if (dividendPercent !== null && dividendPercent.length === 2) {
             const tempPct = dividendPercent[1];
             Logger.log(`Yahoo. Stock=${symbol}. PERCENT=${tempPct}`);
@@ -2145,9 +1918,11 @@ class YahooFinance {
         }
 
         const baseSymbol = YahooFinance.getTicker(symbol);
-        const re = new RegExp(`data-symbol="${baseSymbol}".+?"regularMarketPrice".+?value="(\\d*\\.?\\d*)?"`);
+        const re = new RegExp(`qsp-price"\>(\\d{0,5}\.?\\d{0,4})?`);
 
         const priceMatch = html.match(re);
+        Logger.log("yahoo price match=" + re);
+        Logger.log(priceMatch);
 
         if (priceMatch !== null && priceMatch.length === 2) {
             const tempPrice = priceMatch[1];

@@ -41,15 +41,12 @@ class CacheFinanceTest {
         this.cacheTestRun.run("YahooApi", YahooApi.getInfo, "NASDAQ:VTC", "PRICE");
         this.cacheTestRun.run("YahooApi", YahooApi.getInfo, "NEO:CJP", "PRICE");
 
-        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "NYSEARCA:SHYG");
-        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "NEO:CJP");
-        this.cacheTestRun.run("TD", TdMarketResearch.getInfo, "TSE:RY", "ALL", "STOCK");
-
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "NYSEARCA:VOO");
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "TSE:FTN-A");
         this.cacheTestRun.run("GlobeAndMail", GlobeAndMail.getInfo, "NEO:CJP");
 
         this.cacheTestRun.run("GoogleWebSiteFinance", GoogleWebSiteFinance.getInfo, "NEO:CJP");
+        this.cacheTestRun.run("GoogleWebSiteFinance", GoogleWebSiteFinance.getInfo, "NYSEARCA:VOO");
 
         this.cacheTestRun.run("Finnhub", FinnHub.getInfo, "NYSEARCA:VOO", "PRICE");
         this.cacheTestRun.run("AlphaVantage", AlphaVantage.getInfo, "NYSEARCA:VOO", "PRICE");
