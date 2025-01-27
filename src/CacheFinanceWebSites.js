@@ -322,7 +322,7 @@ class YahooFinance {
         }
         
         //  skipcq:  JS-0097
-        let dividendPercent = html.match('title="Yield">Yield</span> <[^>]*>(\\d{0,5}\.?\\d{0,4})?');    
+        let dividendPercent = html.match('title="Yield">Yield</span> <[^>]*>(\\d{0,5}\.?\\d{0,4})');    
         if (dividendPercent !== null && dividendPercent.length === 2) {
             const tempPct = dividendPercent[1];
             Logger.log(`Yahoo. Stock=${symbol}. PERCENT=${tempPct}`);
@@ -335,7 +335,7 @@ class YahooFinance {
         }
 
         //  skipcq:  JS-0097
-        const priceMatch = html.match('qsp-price">(\\d{0,5}\.?\\d{0,4})?');
+        const priceMatch = html.match('qsp-price">(\\d{0,5}\.?\\d{0,4})');
         if (priceMatch !== null && priceMatch.length === 2) {
             const tempPrice = priceMatch[1];
             Logger.log(`Yahoo. Stock=${symbol}.PRICE=${tempPrice}`);
@@ -572,7 +572,7 @@ class GlobeAndMail {
         }
 
         //  Get the price.
-        parts = html.match(/."lastPrice":"(\d{0,4}\.?\d{0,4})"/);
+        parts = html.match(/."lastPrice":"match"/);
         if (parts !== null && parts.length === 2) {
 
             const parsedValue = parseFloat(parts[1]);
