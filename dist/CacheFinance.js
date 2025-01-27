@@ -2133,10 +2133,9 @@ class GlobeAndMail {
     /**
      * 
      * @param {String} html 
-     * @param {String} symbol
      * @returns {StockAttributes}
      */
-    static parseResponse(html, symbol) {
+    static parseResponse(html) {
         const data = new StockAttributes();
 
         //  Get the dividend yield.
