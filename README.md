@@ -72,6 +72,11 @@
         * Set the property name to: **TWELVE_DATA_API_KEY**
         * Set the value to:  *'YOUR Twelve Data API Key'*
           * Get your API key at:  https://twelvedata.com/
+* Canadian Mutual Funds.
+  * GOOGLEFINANCE does not support (the one I have anyway) Canadian mutual fund codes.
+  * I use the Globe and Mail web site to extract the data.
+    * Use the exchange code of 'CF' plus the mutual fund code like:  "CF:DYN2752"
+      * e.g.  ```=CACHEFINANCE("CF:DYN2752", "PRICE")``` 
 
 
 ## Using as a custom function.
