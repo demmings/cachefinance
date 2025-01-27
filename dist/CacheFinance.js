@@ -1678,6 +1678,9 @@ class FinanceWebSites {
             case "CURRENCY":
                 countryCode = "fx";
                 break;
+            case "CF":      //  a Mutual fund
+                countryCode = "mut";
+                break;
             default:
                 countryCode = "ca";     //  We the north!
                 break;
@@ -1901,9 +1904,9 @@ class YahooFinance {
         if (symbol === '') {
             return data;
         }
-        
+
         //  skipcq:  JS-0097
-        let dividendPercent = html.match('title="Yield">Yield</span> <[^>]*>(\\d{0,5}\.?\\d{0,4})');    
+        let dividendPercent = html.match('title="Yield">Yield</span> <[^>]*>(\\d{0,5}\.?\\d{0,4})');
         if (dividendPercent !== null && dividendPercent.length === 2) {
             const tempPct = dividendPercent[1];
             Logger.log(`Yahoo. Stock=${symbol}. PERCENT=${tempPct}`);
@@ -2097,7 +2100,7 @@ class GlobeAndMail {
             return new StockAttributes();
         }
 
-        return GlobeAndMail.parseResponse(html);
+        return GlobeAndMail.parseResponse(html, symbol);
     }
 
     /**
@@ -2109,6 +2112,11 @@ class GlobeAndMail {
     static getURL(symbol, _attribute) {
         if (FinanceWebSites.getTickerCountryCode(symbol) === "fx") {
             return "";
+        }
+
+        //  Mutual fund
+        if (FinanceWebSites.getTickerCountryCode(symbol) === "mut") {
+            return `https://www.theglobeandmail.com/investing/markets/funds/${GlobeAndMail.getTicker(symbol)}`;
         }
 
         return `https://www.theglobeandmail.com/investing/markets/stocks/${GlobeAndMail.getTicker(symbol)}`;
@@ -2125,16 +2133,22 @@ class GlobeAndMail {
     /**
      * 
      * @param {String} html 
+     * @param {String} symbol
      * @returns {StockAttributes}
      */
-    static parseResponse(html) {
+    static parseResponse(html, symbol) {
         const data = new StockAttributes();
 
         //  Get the dividend yield.
         let parts = html.match(/.name="dividendYieldTrailing".*?value="(\d{0,4}\.?\d{0,4})%/);
 
-        if (parts === null)
+        if (parts === null) {
             parts = html.match(/.name=\\"dividendYieldTrailing\\".*?value=\\"(\d{0,4}\.?\d{0,4})%/);
+        }
+
+        if (parts === null) {
+            parts = html.match(/"distributionYield" type="percent" value="(\d{0,4}\.?\d{0,4})%"/);
+        }
 
         if (parts !== null && parts.length === 2) {
             const tempPct = parts[1];
@@ -2152,8 +2166,10 @@ class GlobeAndMail {
             data.stockName = parts[1];
         }
 
+
         //  Get the price.
-        parts = html.match(/."lastPrice":"match"/);
+        parts = html.match(/"lastPrice" value="(\d{0,4}\.?\d{0,4})"/);
+
         if (parts !== null && parts.length === 2) {
 
             const parsedValue = parseFloat(parts[1]);
@@ -2196,6 +2212,9 @@ class GlobeAndMail {
                     break;
                 case "NASDAQ":
                     symbol = `${parts[1]}-Q`;
+                    break;
+                case "CF":
+                    symbol = `${parts[1]}.CF`;
                     break;
                 default:
                     symbol = '#N/A';
