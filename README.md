@@ -34,6 +34,7 @@
 
 # Installing
 
+* Googles guide to adding custom functions: [Google Help](https://developers.google.com/apps-script/guides/sheets/functions#creating_a_custom_function)
 * Copy files manually.
 * In the ./dist folder there is one file.  Only one is required.  
     * [CacheFinance.js](https://github.com/demmings/cachefinance/blob/main/dist/CacheFinance.js)
