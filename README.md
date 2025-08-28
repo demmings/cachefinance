@@ -22,6 +22,7 @@
   * Use this for ONE symbol and ONE attribute lookup.
 * **CACHEFINANCES** is a custom function similar to **CACHEFINANCE** except it is used to process a range of symbols.
 * Valid **STOCK** data is always available even when GOOGLEFINANCE refuses to work.
+* **Warning!!!** When a stock/ETF switches to a new exchange and you do not update the exchange code, CACHEFINANCE will continue to report the LAST quote it was able to obtain for a very long period of time.  This of course leads to portfolio valuations to drift from actual as time goes by.  You therefore need to periodically manually inspect the CACHEFINANCE price versus a quote you would have with your broker.
 * GOOGLEFINANCE does not support all stock symbols.  Many unsupported google stocks can still get price/name/yield data (using web screen scraping).
 * GOOGLEFINANCE does not support all currency conversions.  CACHEFINANCE will lookup any failing currency conversions if GOOGLEFINANCE fails (strangely, I am pulling this data from the google finance web site - which works most of the time)
 * As you can guess from the name, data is cached so when '#N/A' appears, it uses the last known value so that it does not mess up your asset history logging/graphing.
