@@ -2207,6 +2207,7 @@ class GlobeAndMail {
                     symbol = `${parts[1]}-NE`;
                     break;
                 case "NYSEARCA":
+                case "BATS":
                     symbol = `${parts[1]}-A`;
                     break;
                 case "NASDAQ":

@@ -1,7 +1,7 @@
 /*  *** DEBUG START ***
 //  Remove comments for testing in NODE
 
-import { TdMarketResearch, GlobeAndMail, YahooFinance, YahooApi, GoogleWebSiteFinance, FinnHub, AlphaVantage, TwelveData, StockAttributes } from "./CacheFinanceWebSites.js";
+import { GlobeAndMail, YahooFinance, YahooApi, GoogleWebSiteFinance, FinnHub, AlphaVantage, TwelveData, StockAttributes } from "./CacheFinanceWebSites.js";
 import { ThirdPartyFinance, FinanceWebsiteSearch } from "./CacheFinance3rdParty.js";
 import { CACHEFINANCE, CacheFinance } from "./CacheFinance.js";
 export { cacheFinanceTest };

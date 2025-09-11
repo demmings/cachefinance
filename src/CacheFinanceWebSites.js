@@ -5,7 +5,7 @@ import { SiteThrottle, ThresholdPeriod } from "./CacheFinanceUtils.js";
 export { FinanceWebSites };
 export { StockAttributes };
 export { FinanceWebSite };
-export { TdMarketResearch, GlobeAndMail, YahooFinance, YahooApi, FinnHub, AlphaVantage, GoogleWebSiteFinance, TwelveData };
+export { GlobeAndMail, YahooFinance, YahooApi, FinnHub, AlphaVantage, GoogleWebSiteFinance, TwelveData };
 
 class Logger {
     static log(msg) {
@@ -626,6 +626,7 @@ class GlobeAndMail {
                     symbol = `${parts[1]}-NE`;
                     break;
                 case "NYSEARCA":
+                case "BATS":
                     symbol = `${parts[1]}-A`;
                     break;
                 case "NASDAQ":
