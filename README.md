@@ -86,6 +86,8 @@
 * When it is working, GOOGLEFINANCE() is much faster to retrieve stock data than calling a URL and scraping the finance data - so it is used as the default source of information.
 * When GOOGLEFINANCE() works, the data is cached.
 * When GOOGLEFINANCE() fails ('#N/A'), CACHEFINANCE() will search for a cached version of the data.  It is better to return a reasonable value, rather than just fail.  If your asset tracking scripts have just one bad data point, your total values will be invalid.
+* Runnings custom functions (like CACHEFINANCE), can be slow.  One approach to using the function is to ONLY have it run when GOOGLEFINANCE() fails and then run CACHEFINANCE.  
+  * e.g.  **=IFERROR(GOOGLEFINANCE("NEO:ZTL"),CACHEFINANCE("NEO:ZTL"))**   
 * If the data cannot be found in cache, the function will attempt to find the data at various financial websites.  This process however can take several seconds just to retrieve one data point.
 * If this also fails, PRICE and YIELDPCT return 0, while NAME returns an empty string.
 * **CAVEAT EMPTOR**.  Custom functions are also far from perfect.  If Google Sheets decides to throw up the dreaded 'Loading' error, you are almost back to where we started with an unreliable GOOGLEFINANCE() function.
