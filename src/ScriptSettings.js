@@ -72,7 +72,9 @@ class ScriptSettings {      //  skipcq: JS-0128
      */
     putAll(propertyDataObject, daysToHold = 1) {
         const keys = Object.keys(propertyDataObject);
-        keys.forEach(key => this.put(key, propertyDataObject[key], daysToHold));
+        for (const key of keys) {
+            this.put(key, propertyDataObject[key], daysToHold);
+        }
     }
 
     /**
@@ -116,7 +118,7 @@ class ScriptSettings {      //  skipcq: JS-0128
         for (const key of cacheKeys) {
             const myData = allProperties[key];
 
-            if (typeof myData === 'undefined') {
+            if (myData === undefined) {
                 values.push(null);
             }
             else {

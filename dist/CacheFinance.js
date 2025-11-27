@@ -530,7 +530,9 @@ class ScriptSettings {      //  skipcq: JS-0128
      */
     putAll(propertyDataObject, daysToHold = 1) {
         const keys = Object.keys(propertyDataObject);
-        keys.forEach(key => this.put(key, propertyDataObject[key], daysToHold));
+        for (const key of keys) {
+            this.put(key, propertyDataObject[key], daysToHold);
+        }
     }
 
     /**
@@ -574,7 +576,7 @@ class ScriptSettings {      //  skipcq: JS-0128
         for (const key of cacheKeys) {
             const myData = allProperties[key];
 
-            if (typeof myData === 'undefined') {
+            if (myData === undefined) {
                 values.push(null);
             }
             else {
@@ -1962,6 +1964,10 @@ class YahooFinance {
                 modifiedSymbol = `${symbolParts[1]}.SI`;
             if (symbolParts[0] === "NEO")
                 modifiedSymbol = `${symbolParts[1]}.NE`;
+            if (symbolParts[0] === "AS")
+                modifiedSymbol = `${symbolParts[1]}.AS`;
+            if (symbolParts[0] === "MI")
+                modifiedSymbol = `${symbolParts[1]}.MI`;
 
         }
         return modifiedSymbol;

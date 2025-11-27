@@ -381,6 +381,10 @@ class YahooFinance {
                 modifiedSymbol = `${symbolParts[1]}.SI`;
             if (symbolParts[0] === "NEO")
                 modifiedSymbol = `${symbolParts[1]}.NE`;
+            if (symbolParts[0] === "AS")
+                modifiedSymbol = `${symbolParts[1]}.AS`;
+            if (symbolParts[0] === "MI")
+                modifiedSymbol = `${symbolParts[1]}.MI`;
 
         }
         return modifiedSymbol;
