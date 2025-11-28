@@ -374,14 +374,14 @@ class CacheFinance {
                 return CacheFinance.getBlockedProvider(symbol, attribute);
 
             case "SET":
-                if (cmdOption !== "" && CacheFinance.listProviders().indexOf(cmdOption) === -1) {
+                if (cmdOption !== "" && !CacheFinance.listProviders().includes(cmdOption)) {
                     return "Invalid provider name.  No change made.";
                 }
                 CacheFinance.setProviderAsFavourite(symbol, attribute, cmdOption);
                 return `New provider (${cmdOption}) set as default for: ${symbol} ${attribute}`;
 
             case "SETBLOCKED":
-                if (cmdOption !== "" && CacheFinance.listProviders().indexOf(cmdOption) === -1) {
+                if (cmdOption !== "" && !CacheFinance.listProviders().includes(cmdOption)) {
                     return "Invalid provider name.  No change made.";
                 }
                 CacheFinance.setBlockedProvider(symbol, attribute, cmdOption);
@@ -409,16 +409,16 @@ class CacheFinance {
         const objectKey = CacheFinanceUtils.makeCacheKey(symbol, attribute);
         Logger.log(`Removing current site for ${objectKey}`);
 
-        if (typeof bestStockSites[objectKey] !== 'undefined') {
+        if (bestStockSites[objectKey] === undefined) {
+            statusMessage = `Currently no preferred site for ${symbol} ${attribute}`;
+        }
+        else {
             const badSite = bestStockSites[objectKey];
             statusMessage = `Site removed for lookups: ${badSite}`;
             Logger.log(`Removing site from list: ${badSite}`);
             delete bestStockSites[objectKey];
             bestStockSites[CacheFinanceUtils.makeIgnoreSiteCacheKey(symbol, attribute)] = badSite;
             FinanceWebsiteSearch.writeBestStockWebsites(bestStockSites);
-        }
-        else {
-            statusMessage = `Currently no preferred site for ${symbol} ${attribute}`;
         }
 
         return statusMessage;
@@ -495,7 +495,7 @@ class CacheFinance {
         let currentSite = "No site set.";
         const bestStockSites = FinanceWebsiteSearch.readBestStockWebsites();
 
-        if (typeof bestStockSites[objectKey] !== 'undefined') {
+        if (bestStockSites[objectKey] !== undefined) {
             currentSite = bestStockSites[objectKey];
         }
 

@@ -57,7 +57,7 @@ class FinanceWebSites {
     getByName(name) {
         const siteInfo = this.siteMap.get(name.toUpperCase());
 
-        return (typeof siteInfo === 'undefined') ? null : siteInfo;
+        return (siteInfo === undefined) ? null : siteInfo;
     }
 
     /**
@@ -244,7 +244,7 @@ class StockAttributes {
         switch (attribute) {
             case "PRICE":
                 {
-                    const retVal = this.stockPrice !== null && !isNaN(this.stockPrice) && this.stockPrice !== 0;
+                    const retVal = this.stockPrice !== null && !Number.isNaN(this.stockPrice) && this.stockPrice !== 0;
                     Logger.log(`price=${this.stockPrice}. Is Valid=${retVal}`);
                     return retVal;
                 }
@@ -330,9 +330,9 @@ class YahooFinance {
             const tempPct = dividendPercent[1];
             Logger.log(`Yahoo. Stock=${symbol}. PERCENT=${tempPct}`);
 
-            data.yieldPct = parseFloat(tempPct) / 100;
+            data.yieldPct = Number.parseFloat(tempPct) / 100;
 
-            if (isNaN(data.yieldPct)) {
+            if (Number.isNaN(data.yieldPct)) {
                 data.yieldPct = null;
             }
         }
@@ -343,9 +343,9 @@ class YahooFinance {
             const tempPrice = priceMatch[1];
             Logger.log(`Yahoo. Stock=${symbol}.PRICE=${tempPrice}`);
 
-            data.stockPrice = parseFloat(tempPrice);
+            data.stockPrice = Number.parseFloat(tempPrice);
 
-            if (isNaN(data.stockPrice)) {
+            if (Number.isNaN(data.stockPrice)) {
                 data.stockPrice = null;
             }
         }
@@ -468,7 +468,7 @@ class YahooApi {
 
                 stockData.stockPrice = parseFloat(regularMarketPrice);
 
-                if (isNaN(stockData.stockPrice)) {
+                if (Number.isNaN(stockData.stockPrice)) {
                     stockData.stockPrice = null;
                 }
 
@@ -575,9 +575,9 @@ class GlobeAndMail {
         if (parts !== null && parts.length === 2) {
             const tempPct = parts[1];
 
-            const parsedValue = parseFloat(tempPct) / 100;
+            const parsedValue = Number.parseFloat(tempPct) / 100;
 
-            if (!isNaN(parsedValue)) {
+            if (!Number.isNaN(parsedValue)) {
                 data.yieldPct = parsedValue;
             }
         }
@@ -594,8 +594,8 @@ class GlobeAndMail {
 
         if (parts !== null && parts.length === 2) {
 
-            const parsedValue = parseFloat(parts[1]);
-            if (!isNaN(parsedValue)) {
+            const parsedValue = Number.parseFloat(parts[1]);
+            if (!Number.isNaN(parsedValue)) {
                 data.stockPrice = parsedValue;
             }
         }
@@ -617,10 +617,10 @@ class GlobeAndMail {
             switch (parts[0].toUpperCase()) {
                 case "TSE":
                     symbol = parts[1];
-                    if (parts[1].indexOf(".") !== -1) {
+                    if (parts[1].includes(".")) {
                         symbol = parts[1].replace(".", "-");
                     }
-                    else if (parts[1].indexOf("-") !== -1) {
+                    else if (parts[1].includes("-")) {
                         const prefShare = parts[1].split("-");
                         symbol = `${prefShare[0]}-PR-${prefShare[1]}`;
                     }
@@ -981,9 +981,9 @@ class GoogleWebSiteFinance {
         if (dividendPercent !== null && dividendPercent.length > 1) {
             const tempPct = dividendPercent[1];
 
-            data = parseFloat(tempPct) / 100;
+            data = Number.parseFloat(tempPct) / 100;
 
-            if (isNaN(data)) {
+            if (Number.isNaN(data)) {
                 data = null;
             }
         }
@@ -1003,9 +1003,9 @@ class GoogleWebSiteFinance {
         if (priceMatch !== null && priceMatch.length > 1) {
             const tempPrice = priceMatch[1];
 
-            data = parseFloat(tempPrice);
+            data = Number.parseFloat(tempPrice);
 
-            if (isNaN(data)) {
+            if (Number.isNaN(data)) {
                 data = null;
             }
         }
@@ -1050,13 +1050,13 @@ class GoogleWebSiteFinance {
         if (colon >= 0) {
             const symbolParts = symbol.split(":");
 
-            if (FinanceWebSites.getTickerCountryCode(symbol) !== "fx") {
-                modifiedSymbol = `${symbolParts[1]}:${symbolParts[0]}`;
-            }
-            else {
+            if (FinanceWebSites.getTickerCountryCode(symbol) === "fx") {
                 const fromCurrency = symbolParts[1].substring(0, 3);
                 const toCurrency = symbolParts[1].substring(3, 6);
                 modifiedSymbol = `${fromCurrency}-${toCurrency}?hl=en`;
+            }
+            else {
+                modifiedSymbol = `${symbolParts[1]}:${symbolParts[0]}`;
             }
         }
         return modifiedSymbol;

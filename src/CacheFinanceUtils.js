@@ -107,7 +107,7 @@ class CacheFinanceUtils {                       // skipcq: JS-0128
         const cachedDataList = [];
 
         cacheKeys.forEach(key => {
-            const parsedData = typeof data[key] === 'undefined' ? null : JSON.parse(data[key]);
+            const parsedData = data[key] === undefined ? null : JSON.parse(data[key]);
             cachedDataList.push(parsedData);
         });
 
@@ -184,7 +184,7 @@ class CacheFinanceUtils {                       // skipcq: JS-0128
      * @returns {Boolean}
      */
     static isValidGoogleValue(value) {
-        return value !== null && typeof value !== 'undefined' && value !== "#N/A" && value !== '#ERROR!' && value !== '';
+        return value !== null && value !== undefined && value !== "#N/A" && value !== '#ERROR!' && value !== '';
     }
 
     /**

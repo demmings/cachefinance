@@ -329,14 +329,14 @@ class CacheFinance {
                 return CacheFinance.getBlockedProvider(symbol, attribute);
 
             case "SET":
-                if (cmdOption !== "" && CacheFinance.listProviders().indexOf(cmdOption) === -1) {
+                if (cmdOption !== "" && !CacheFinance.listProviders().includes(cmdOption)) {
                     return "Invalid provider name.  No change made.";
                 }
                 CacheFinance.setProviderAsFavourite(symbol, attribute, cmdOption);
                 return `New provider (${cmdOption}) set as default for: ${symbol} ${attribute}`;
 
             case "SETBLOCKED":
-                if (cmdOption !== "" && CacheFinance.listProviders().indexOf(cmdOption) === -1) {
+                if (cmdOption !== "" && !CacheFinance.listProviders().includes(cmdOption)) {
                     return "Invalid provider name.  No change made.";
                 }
                 CacheFinance.setBlockedProvider(symbol, attribute, cmdOption);
@@ -364,16 +364,16 @@ class CacheFinance {
         const objectKey = CacheFinanceUtils.makeCacheKey(symbol, attribute);
         Logger.log(`Removing current site for ${objectKey}`);
 
-        if (typeof bestStockSites[objectKey] !== 'undefined') {
+        if (bestStockSites[objectKey] === undefined) {
+            statusMessage = `Currently no preferred site for ${symbol} ${attribute}`;
+        }
+        else {
             const badSite = bestStockSites[objectKey];
             statusMessage = `Site removed for lookups: ${badSite}`;
             Logger.log(`Removing site from list: ${badSite}`);
             delete bestStockSites[objectKey];
             bestStockSites[CacheFinanceUtils.makeIgnoreSiteCacheKey(symbol, attribute)] = badSite;
             FinanceWebsiteSearch.writeBestStockWebsites(bestStockSites);
-        }
-        else {
-            statusMessage = `Currently no preferred site for ${symbol} ${attribute}`;
         }
 
         return statusMessage;
@@ -450,7 +450,7 @@ class CacheFinance {
         let currentSite = "No site set.";
         const bestStockSites = FinanceWebsiteSearch.readBestStockWebsites();
 
-        if (typeof bestStockSites[objectKey] !== 'undefined') {
+        if (bestStockSites[objectKey] !== undefined) {
             currentSite = bestStockSites[objectKey];
         }
 
@@ -811,7 +811,7 @@ class FinanceWebsiteSearch {
                     stockData.skipToNextSite();
                 }
             }
-            
+
             if (URL !== "") {
                 URLs.push(URL);
                 batchUsedStockSites.push(stockData);
@@ -935,13 +935,8 @@ class FinanceWebsiteSearch {
         });
 
         let dataSet = [];
-        try {
-            const rawSiteData = UrlFetchApp.fetchAll(fetchURLs);
-            dataSet = rawSiteData.map(response => response.getContentText());
-        }
-        catch (ex) {
-            return dataSet;
-        };
+        const rawSiteData = UrlFetchApp.fetchAll(fetchURLs);
+        dataSet = rawSiteData.map(response => response.getContentText());
 
         return dataSet;
     }
@@ -1115,7 +1110,7 @@ class StockWebURL {
      */
     updateBestSites(bestStockSites, attribute) {
         const key = CacheFinanceUtils.makeCacheKey(this.symbol, attribute);
-        bestStockSites[key] = (!this?.stockAttributes.isAttributeSet(attribute)) ? "" : this.siteName[this.siteIterator];
+        bestStockSites[key] = (this?.stockAttributes.isAttributeSet(attribute)) ?  this.siteName[this.siteIterator] : "";
     }
 
     /**
@@ -1459,15 +1454,15 @@ class CacheFinanceTestRun {
         for (const testRun of this.testRuns) {
             row = [];
 
-            row.push(testRun.serviceName);
-            row.push(testRun.symbol);
-            row.push(testRun.status);
-            row.push(testRun.stockAttributes.stockPrice);
-            row.push(testRun.stockAttributes.yieldPct);
-            row.push(testRun.stockAttributes.stockName);
-            row.push(testRun._attributeLookup);
-            row.push(testRun.typeLookup);
-            row.push(testRun.runTime);
+            row.push(testRun.serviceName,
+                testRun.symbol,
+                testRun.status,
+                testRun.stockAttributes.stockPrice,
+                testRun.stockAttributes.yieldPct,
+                testRun.stockAttributes.stockName,
+                testRun._attributeLookup,
+                testRun.typeLookup,
+                testRun.runTime);
 
             resultTable.push(row);
         }
@@ -1640,7 +1635,7 @@ class FinanceWebSites {
     getByName(name) {
         const siteInfo = this.siteMap.get(name.toUpperCase());
 
-        return (typeof siteInfo === 'undefined') ? null : siteInfo;
+        return (siteInfo === undefined) ? null : siteInfo;
     }
 
     /**
@@ -1827,7 +1822,7 @@ class StockAttributes {
         switch (attribute) {
             case "PRICE":
                 {
-                    const retVal = this.stockPrice !== null && !isNaN(this.stockPrice) && this.stockPrice !== 0;
+                    const retVal = this.stockPrice !== null && !Number.isNaN(this.stockPrice) && this.stockPrice !== 0;
                     Logger.log(`price=${this.stockPrice}. Is Valid=${retVal}`);
                     return retVal;
                 }
@@ -1913,9 +1908,9 @@ class YahooFinance {
             const tempPct = dividendPercent[1];
             Logger.log(`Yahoo. Stock=${symbol}. PERCENT=${tempPct}`);
 
-            data.yieldPct = parseFloat(tempPct) / 100;
+            data.yieldPct = Number.parseFloat(tempPct) / 100;
 
-            if (isNaN(data.yieldPct)) {
+            if (Number.isNaN(data.yieldPct)) {
                 data.yieldPct = null;
             }
         }
@@ -1926,9 +1921,9 @@ class YahooFinance {
             const tempPrice = priceMatch[1];
             Logger.log(`Yahoo. Stock=${symbol}.PRICE=${tempPrice}`);
 
-            data.stockPrice = parseFloat(tempPrice);
+            data.stockPrice = Number.parseFloat(tempPrice);
 
-            if (isNaN(data.stockPrice)) {
+            if (Number.isNaN(data.stockPrice)) {
                 data.stockPrice = null;
             }
         }
@@ -2051,7 +2046,7 @@ class YahooApi {
 
                 stockData.stockPrice = parseFloat(regularMarketPrice);
 
-                if (isNaN(stockData.stockPrice)) {
+                if (Number.isNaN(stockData.stockPrice)) {
                     stockData.stockPrice = null;
                 }
 
@@ -2158,9 +2153,9 @@ class GlobeAndMail {
         if (parts !== null && parts.length === 2) {
             const tempPct = parts[1];
 
-            const parsedValue = parseFloat(tempPct) / 100;
+            const parsedValue = Number.parseFloat(tempPct) / 100;
 
-            if (!isNaN(parsedValue)) {
+            if (!Number.isNaN(parsedValue)) {
                 data.yieldPct = parsedValue;
             }
         }
@@ -2177,8 +2172,8 @@ class GlobeAndMail {
 
         if (parts !== null && parts.length === 2) {
 
-            const parsedValue = parseFloat(parts[1]);
-            if (!isNaN(parsedValue)) {
+            const parsedValue = Number.parseFloat(parts[1]);
+            if (!Number.isNaN(parsedValue)) {
                 data.stockPrice = parsedValue;
             }
         }
@@ -2200,10 +2195,10 @@ class GlobeAndMail {
             switch (parts[0].toUpperCase()) {
                 case "TSE":
                     symbol = parts[1];
-                    if (parts[1].indexOf(".") !== -1) {
+                    if (parts[1].includes(".")) {
                         symbol = parts[1].replace(".", "-");
                     }
-                    else if (parts[1].indexOf("-") !== -1) {
+                    else if (parts[1].includes("-")) {
                         const prefShare = parts[1].split("-");
                         symbol = `${prefShare[0]}-PR-${prefShare[1]}`;
                     }
@@ -2564,9 +2559,9 @@ class GoogleWebSiteFinance {
         if (dividendPercent !== null && dividendPercent.length > 1) {
             const tempPct = dividendPercent[1];
 
-            data = parseFloat(tempPct) / 100;
+            data = Number.parseFloat(tempPct) / 100;
 
-            if (isNaN(data)) {
+            if (Number.isNaN(data)) {
                 data = null;
             }
         }
@@ -2586,9 +2581,9 @@ class GoogleWebSiteFinance {
         if (priceMatch !== null && priceMatch.length > 1) {
             const tempPrice = priceMatch[1];
 
-            data = parseFloat(tempPrice);
+            data = Number.parseFloat(tempPrice);
 
-            if (isNaN(data)) {
+            if (Number.isNaN(data)) {
                 data = null;
             }
         }
@@ -2633,13 +2628,13 @@ class GoogleWebSiteFinance {
         if (colon >= 0) {
             const symbolParts = symbol.split(":");
 
-            if (FinanceWebSites.getTickerCountryCode(symbol) !== "fx") {
-                modifiedSymbol = `${symbolParts[1]}:${symbolParts[0]}`;
-            }
-            else {
+            if (FinanceWebSites.getTickerCountryCode(symbol) === "fx") {
                 const fromCurrency = symbolParts[1].substring(0, 3);
                 const toCurrency = symbolParts[1].substring(3, 6);
                 modifiedSymbol = `${fromCurrency}-${toCurrency}?hl=en`;
+            }
+            else {
+                modifiedSymbol = `${symbolParts[1]}:${symbolParts[0]}`;
             }
         }
         return modifiedSymbol;
@@ -2884,7 +2879,7 @@ class CacheFinanceUtils {                       // skipcq: JS-0128
         const cachedDataList = [];
 
         cacheKeys.forEach(key => {
-            const parsedData = typeof data[key] === 'undefined' ? null : JSON.parse(data[key]);
+            const parsedData = data[key] === undefined ? null : JSON.parse(data[key]);
             cachedDataList.push(parsedData);
         });
 
@@ -2961,7 +2956,7 @@ class CacheFinanceUtils {                       // skipcq: JS-0128
      * @returns {Boolean}
      */
     static isValidGoogleValue(value) {
-        return value !== null && typeof value !== 'undefined' && value !== "#N/A" && value !== '#ERROR!' && value !== '';
+        return value !== null && value !== undefined && value !== "#N/A" && value !== '#ERROR!' && value !== '';
     }
 
     /**

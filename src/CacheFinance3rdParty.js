@@ -128,7 +128,7 @@ class FinanceWebsiteSearch {
                     stockData.skipToNextSite();
                 }
             }
-            
+
             if (URL !== "") {
                 URLs.push(URL);
                 batchUsedStockSites.push(stockData);
@@ -252,13 +252,8 @@ class FinanceWebsiteSearch {
         });
 
         let dataSet = [];
-        try {
-            const rawSiteData = UrlFetchApp.fetchAll(fetchURLs);
-            dataSet = rawSiteData.map(response => response.getContentText());
-        }
-        catch (ex) {
-            return dataSet;
-        };
+        const rawSiteData = UrlFetchApp.fetchAll(fetchURLs);
+        dataSet = rawSiteData.map(response => response.getContentText());
 
         return dataSet;
     }
@@ -432,7 +427,7 @@ class StockWebURL {
      */
     updateBestSites(bestStockSites, attribute) {
         const key = CacheFinanceUtils.makeCacheKey(this.symbol, attribute);
-        bestStockSites[key] = (!this?.stockAttributes.isAttributeSet(attribute)) ? "" : this.siteName[this.siteIterator];
+        bestStockSites[key] = (this?.stockAttributes.isAttributeSet(attribute)) ?  this.siteName[this.siteIterator] : "";
     }
 
     /**

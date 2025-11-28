@@ -121,15 +121,15 @@ class CacheFinanceTestRun {
         for (const testRun of this.testRuns) {
             row = [];
 
-            row.push(testRun.serviceName);
-            row.push(testRun.symbol);
-            row.push(testRun.status);
-            row.push(testRun.stockAttributes.stockPrice);
-            row.push(testRun.stockAttributes.yieldPct);
-            row.push(testRun.stockAttributes.stockName);
-            row.push(testRun._attributeLookup);
-            row.push(testRun.typeLookup);
-            row.push(testRun.runTime);
+            row.push(testRun.serviceName,
+                testRun.symbol,
+                testRun.status,
+                testRun.stockAttributes.stockPrice,
+                testRun.stockAttributes.yieldPct,
+                testRun.stockAttributes.stockName,
+                testRun._attributeLookup,
+                testRun.typeLookup,
+                testRun.runTime);
 
             resultTable.push(row);
         }
