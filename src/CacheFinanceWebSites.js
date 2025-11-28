@@ -466,7 +466,7 @@ class YahooApi {
             if (data?.chart?.result.length > 0) {
                 const regularMarketPrice = data.chart.result[0].meta.regularMarketPrice;
 
-                stockData.stockPrice = parseFloat(regularMarketPrice);
+                stockData.stockPrice = Number.parseFloat(regularMarketPrice);
 
                 if (Number.isNaN(stockData.stockPrice)) {
                     stockData.stockPrice = null;
