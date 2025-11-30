@@ -372,24 +372,39 @@ class YahooFinance {
         const colon = symbol.indexOf(":");
 
         if (colon >= 0) {
-            const symbolParts = symbol.split(":");
-
-            modifiedSymbol = symbolParts[1];
-            if (symbolParts[0] === "TSE")
-                modifiedSymbol = `${symbolParts[1]}.TO`;
-            if (symbolParts[0] === "SGX")
-                modifiedSymbol = `${symbolParts[1]}.SI`;
-            if (symbolParts[0] === "NEO")
-                modifiedSymbol = `${symbolParts[1]}.NE`;
-            if (symbolParts[0] === "AS")
-                modifiedSymbol = `${symbolParts[1]}.AS`;
-            if (symbolParts[0] === "MI")
-                modifiedSymbol = `${symbolParts[1]}.MI`;
-
+            modifiedSymbol = YahooFinance.translateExchangeCode(symbol);
         }
+        
         return modifiedSymbol;
     }
 
+    /**
+     * 
+     * @param {String} symbol 
+     * @returns {String}
+     */
+    static translateExchangeCode(symbol) {
+        const [exchangeCode, stockTicker] = symbol.split(":");
+
+        const googleExchange = ["TSE", "SGX", "NEO", "BIT", "AMS", "NASDAQ", "NYSEARCA", "BATS", "BCBA", "ASX", "VIE", "EBR", "CNSX", "TSXV", "SHA", "SHE", "CPH", "HEL", "EPA", "FRA", "ETR", "HKG", "ICE", "BOM", "IDX", "TLV", "TYO", "KLSE", "BMV", "NZE", "ELI", "SGX", "JSE", "KRX", "KOSDAQ", "TADAWUL", "STO", "SWX", "TPE", "BKK", "IST", "LON"];
+
+        const yahooExchange = ["TO", "SI", "NE", "MI", "AS", "", "", "", "BA", "AX", "VI", "BR", "CN", "V", "SS", "SZ", "CO", "HE", "PA", "F", "DE", "HK", "IC", "BO", "JK", "TA", "T", "KL", "MX", "NZ", "LS", "SI", "JO", "KS", "KQ", "SAU", "ST", "SW", "TW", "BK", "IS", "L"];
+
+        const ticker = stockTicker.replaceAll(".", "-");
+
+        let modifiedSymbol = `${ticker}.${exchangeCode}`;
+        const index = googleExchange.indexOf(exchangeCode);
+        if (index !== -1) {
+            if (yahooExchange[index] === "") {
+                modifiedSymbol = ticker;
+            }
+            else {
+                modifiedSymbol = `${ticker}.${yahooExchange[index]}`;
+            }
+        }
+
+        return modifiedSymbol;
+    }
     /**
      * getURL() will receive an instance of the throttling object to query if the limit would be exceeded.
      * @returns {SiteThrottle}
