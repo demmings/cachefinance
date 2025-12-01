@@ -1952,7 +1952,7 @@ class YahooFinance {
         if (colon >= 0) {
             modifiedSymbol = YahooFinance.translateExchangeCode(symbol);
         }
-        
+
         return modifiedSymbol;
     }
 
@@ -1964,20 +1964,60 @@ class YahooFinance {
     static translateExchangeCode(symbol) {
         const [exchangeCode, stockTicker] = symbol.split(":");
 
-        const googleExchange = ["TSE", "SGX", "NEO", "BIT", "AMS", "NASDAQ", "NYSEARCA", "BATS", "BCBA", "ASX", "VIE", "EBR", "CNSX", "TSXV", "SHA", "SHE", "CPH", "HEL", "EPA", "FRA", "ETR", "HKG", "ICE", "BOM", "IDX", "TLV", "TYO", "KLSE", "BMV", "NZE", "ELI", "SGX", "JSE", "KRX", "KOSDAQ", "TADAWUL", "STO", "SWX", "TPE", "BKK", "IST", "LON"];
+        const exchageMapping = {
+            TSE: "TO",
+            NEO: "NE",
+            BIT: "MI",
+            AMS: "AS",
+            NASDAQ: "",
+            NYSEARCA: "",
+            BATS: "",
+            BCBA: "BA",
+            ASX: "AX",
+            VIE: "VI",
+            EBR: "BR",
+            CNSX: "CN",
+            TSXV: "V",
+            SHA: "SS",
+            SHE: "SZ",
+            CPH: "CO",
+            HEL: "HE",
+            EPA: "PA",
+            FRA: "F",
+            ETR: "DE",
+            HKG: "HK",
+            ICE: "IC",
+            BOM: "BO",
+            IDX: "JK",
+            TLV: "TA",
+            TYO: "T",
+            KLSE: "KL",
+            BMV: "MX",
+            NZE: "NZ",
+            ELI: "LS",
+            SGX: "SI",
+            JSE: "JO",
+            KRX: "KS",
+            KOSDAQ: "KQ",
+            TADAWUL: "SAU",
+            STO: "ST",
+            SWX: "SW",
+            TPE: "TW",
+            BKK: "BK",
+            IST: "IS",
+            LON: "L"
+        }
 
-        const yahooExchange = ["TO", "SI", "NE", "MI", "AS", "", "", "", "BA", "AX", "VI", "BR", "CN", "V", "SS", "SZ", "CO", "HE", "PA", "F", "DE", "HK", "IC", "BO", "JK", "TA", "T", "KL", "MX", "NZ", "LS", "SI", "JO", "KS", "KQ", "SAU", "ST", "SW", "TW", "BK", "IS", "L"];
-
+        const translatedExchangecode = exchageMapping[exchangeCode] || null;
         const ticker = stockTicker.replaceAll(".", "-");
 
         let modifiedSymbol = `${ticker}.${exchangeCode}`;
-        const index = googleExchange.indexOf(exchangeCode);
-        if (index !== -1) {
-            if (yahooExchange[index] === "") {
+        if (translatedExchangecode !== null) {
+            if (translatedExchangecode === "") {
                 modifiedSymbol = ticker;
             }
             else {
-                modifiedSymbol = `${ticker}.${yahooExchange[index]}`;
+                modifiedSymbol = `${ticker}.${translatedExchangecode}`;
             }
         }
 
