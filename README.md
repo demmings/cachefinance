@@ -57,8 +57,9 @@
 # Using
 * After adding the script, it will require new permissions.
 * You need to open the script inside the Google Script editor, go to the Run menu and choose 'testYieldPct' from the dropdown. This will prompt you to authorize the script  with the correct permissions.
-* **Finnhub** and **AlphaVantage**
-  * For faster U.S. stock price lookups when external finance data is used, add the key to **Apps Script** ==> **Project Settings** ==> **Script Properties**
+* **Fast REST API Websites**
+  * For faster stock price lookups when external finance data is used, add the key to **Apps Script** ==> **Project Settings** ==> **Script Properties**
+  * The free API will have limitied functionality in all cases.  They are all throttled and may only provide end of day pricing.  You can always get a paid subscription and use that API key if your needs are greater.
     * **Finnhub**
       * Click on **Edit Script Properties** ==> **Add Script Property**.  
         * Set the property name to:  **FINNHUB_API_KEY**
@@ -74,6 +75,12 @@
         * Set the property name to: **TWELVE_DATA_API_KEY**
         * Set the value to:  *'YOUR Twelve Data API Key'*
           * Get your API key at:  https://twelvedata.com/
+    * **CoinMarket**
+      * Site used for crypto currency lookups.
+      * Click on **Edit Script Properties** ==> **Add Script Property**.
+        * Set the property name to: **COINMARKET_API_KEY**
+        * Set the value to:  *'YOUR Coin Market API Key'*
+          * Get your API key at:  https://coinmarketcap.com/api/
 * Canadian Mutual Funds.
   * GOOGLEFINANCE does not support (the one I have anyway) Canadian mutual fund codes.
   * I use the Globe and Mail web site to extract the data.
