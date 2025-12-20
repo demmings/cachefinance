@@ -1,7 +1,7 @@
 /*  *** DEBUG START ***
 //  Remove comments for testing in NODE
 
-import { GlobeAndMail, YahooFinance, YahooApi, GoogleWebSiteFinance, FinnHub, AlphaVantage, TwelveData, StockAttributes } from "./CacheFinanceWebSites.js";
+import { GlobeAndMail, YahooFinance, YahooApi, GoogleWebSiteFinance, FinnHub, AlphaVantage, TwelveData, CoinMarket, StockAttributes } from "./CacheFinanceWebSites.js";
 import { ThirdPartyFinance, FinanceWebsiteSearch } from "./CacheFinance3rdParty.js";
 import { CACHEFINANCE, CacheFinance } from "./CacheFinance.js";
 export { cacheFinanceTest };
@@ -54,6 +54,8 @@ class CacheFinanceTest {
         this.cacheTestRun.run("TwelveData", TwelveData.getInfo, "NYSEARCA:VOO", "PRICE");
         this.cacheTestRun.run("TwelveData", TwelveData.getInfo, "NYSEARCA:VOO", "NAME");
         this.cacheTestRun.run("TwelveData", TwelveData.getInfo, "CURRENCY:USDEUR", "PRICE");
+
+        this.cacheTestRun.run("CoinMarket", CoinMarket.getInfo, "CURRENCY:BTCUSD", "PRICE");
 
         return this.cacheTestRun.getTestRunResults();
     }

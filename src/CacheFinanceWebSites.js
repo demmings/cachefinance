@@ -5,7 +5,7 @@ import { SiteThrottle, ThresholdPeriod } from "./CacheFinanceUtils.js";
 export { FinanceWebSites };
 export { StockAttributes };
 export { FinanceWebSite };
-export { GlobeAndMail, YahooFinance, YahooApi, FinnHub, AlphaVantage, GoogleWebSiteFinance, TwelveData };
+export { GlobeAndMail, YahooFinance, YahooApi, FinnHub, AlphaVantage, GoogleWebSiteFinance, TwelveData, CoinMarket };
 
 class Logger {
     static log(msg) {
@@ -31,7 +31,8 @@ class FinanceWebSites {
             new FinanceWebSite("Globe", GlobeAndMail),
             new FinanceWebSite("Yahoo", YahooFinance),
             new FinanceWebSite("TwelveData", TwelveData),
-            new FinanceWebSite("AlphaVantage", AlphaVantage)
+            new FinanceWebSite("AlphaVantage", AlphaVantage),
+            new FinanceWebSite("CoinMarket", CoinMarket)
         ];
 
         /** @property {Map<String, FinanceWebSite>} */
@@ -136,6 +137,28 @@ class FinanceWebSites {
         const myData = scriptProperties.getProperty(propertyKey);
 
         return myData;
+    }
+
+    /**
+     * 
+     * @param {String} symbol 
+     * @returns {Object}
+     */
+    static getCurrencyTickers(symbol) {
+        const symbolParts = symbol.split(":");
+        if (symbolParts.length !== 2 || symbolParts[1].length < 4) {
+            return {};
+        }
+
+        const fromCurrency = symbolParts[1].substring(0, symbolParts[1].length - 3);
+        const toCurrency = symbolParts[1].substring(symbolParts[1].length - 3);
+
+        const currencyCodes = {
+            fromCurrency,
+            toCurrency
+        }
+
+        return currencyCodes;
     }
 }
 
@@ -245,7 +268,6 @@ class StockAttributes {
             case "PRICE":
                 {
                     const retVal = this.stockPrice !== null && !Number.isNaN(this.stockPrice) && this.stockPrice !== 0;
-                    Logger.log(`price=${this.stockPrice}. Is Valid=${retVal}`);
                     return retVal;
                 }
 
@@ -430,7 +452,8 @@ class YahooFinance {
             LON: "L"
         }
 
-        const translatedExchangecode = exchageMapping[exchangeCode] || null;
+        // @ts-ignore
+        const translatedExchangecode = Object.hasOwn(exchageMapping, exchangeCode) ? exchageMapping[exchangeCode] : null; 
         const ticker = stockTicker.replaceAll(".", "-");
 
         let modifiedSymbol = `${ticker}.${exchangeCode}`;
@@ -863,11 +886,7 @@ class AlphaVantage {
      * @returns {String}
      */
     static getURL(symbol, attribute, API_KEY = null) {
-        if (API_KEY === null) {
-            return "";
-        }
-
-        if (attribute !== "PRICE") {
+        if (API_KEY === null || attribute !== "PRICE") {
             return "";
         }
 
@@ -875,13 +894,11 @@ class AlphaVantage {
         if (!(countryCode === "us" || countryCode === "fx")) {
             return "";
         }
-        const symbolParts = symbol.split(":");
 
         if (countryCode === "fx") {
-            const fromCurrency = symbolParts[1].substring(0, 3);
-            const toCurrency = symbolParts[1].substring(3, 6);
+            const parts = FinanceWebSites.getCurrencyTickers(symbol);
 
-            return `https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=${fromCurrency}&to_currency=${toCurrency}&apikey=${API_KEY}`;
+            return `https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=${parts.fromCurrency}&to_currency=${parts.toCurrency}&apikey=${API_KEY}`;
         }
         else {
             return `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${FinanceWebSites.getBaseTicker(symbol)}&apikey=${API_KEY}`;
@@ -934,6 +951,7 @@ class AlphaVantage {
     static getThrottleObject() {
         //  Basic throttle check
         const limits = [
+            new ThresholdPeriod("SECOND", 1),
             new ThresholdPeriod("DAY", 25)
         ];
 
@@ -1187,11 +1205,9 @@ class TwelveData {
 
         let twelveDataSymbol = "";
         if (countryCode === "fx") {
-            const symbolParts = symbol.split(":");
-            const fromCurrency = symbolParts[1].substring(0, 3);
-            const toCurrency = symbolParts[1].substring(3, 6);
+            const parts = FinanceWebSites.getCurrencyTickers(symbol);
 
-            twelveDataSymbol = `${fromCurrency}/${toCurrency}`;
+            twelveDataSymbol = `${parts.fromCurrency}/${parts.toCurrency}`;
         }
         else {
             twelveDataSymbol = FinanceWebSites.getBaseTicker(symbol);
@@ -1258,3 +1274,125 @@ class TwelveData {
         return new SiteThrottle("TWELVEDATA", limits);
     }
 }
+
+class CoinMarket {
+    /**
+     * 
+     * @param {String} symbol 
+     * @param {String} attribute 
+     * @returns {StockAttributes}
+     */
+    static getInfo(symbol, attribute = "PRICE") {
+        let data = new StockAttributes();
+
+        if (attribute !== "PRICE") {
+            Logger.log(`CoinMarket.  Only PRICE is supported: ${symbol}, ${attribute}`);
+            return data;
+        }
+
+        const countryCode = FinanceWebSites.getTickerCountryCode(symbol);
+        if (countryCode !== "fx") {
+            Logger.log(`CoinMarket --> Only Currency: ${symbol}`);
+            return data;
+        }
+
+        const apiKey = CoinMarket.getApiKey();
+        const URL = CoinMarket.getURL(symbol, attribute, apiKey);
+        Logger.log(`getInfo: CoinMarket  ${symbol}.  URL = ${URL}.  Key = ${apiKey}`);
+
+        let jsonStr = null;
+        try {
+            jsonStr = UrlFetchApp.fetch(URL).getContentText();
+            data = CoinMarket.parseResponse(jsonStr, symbol, attribute);
+        }
+        catch (ex) {
+            return data;
+        }
+
+        return data;
+    }
+
+    /**
+     * 
+     * @param {String} symbol 
+     * @param {String} attribute
+     * @param {String} API_KEY
+     * @returns {String}
+     */
+    static getURL(symbol, attribute, API_KEY = null) {
+        if (API_KEY === null) {
+            return "";
+        }
+
+        if (attribute !== "PRICE") {
+            return "";
+        }
+
+        const countryCode = FinanceWebSites.getTickerCountryCode(symbol);
+        if (countryCode !== "fx") {
+            return "";
+        }
+        
+        const currency = FinanceWebSites.getCurrencyTickers(symbol);
+
+        return `https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=${currency.fromCurrency}&convert=${currency.toCurrency}&CMC_PRO_API_KEY=${API_KEY}`;
+    }
+
+    /**
+     * 
+     * @returns {String}
+     */
+    static getApiKey() {
+        return FinanceWebSites.getApiKey("COINMARKET_API_KEY");
+    }
+
+    /**
+     * 
+     * @param {String} jsonStr 
+     * @param {String} symbol
+     * @param {String} _attribute
+     * @returns {StockAttributes}
+     */
+    static parseResponse(jsonStr, symbol, _attribute) {
+        Logger.log(`content=${jsonStr}`);
+
+        const data = new StockAttributes();
+        const coinMarketData = JSON.parse(jsonStr);
+
+        try {
+            const parts = FinanceWebSites.getCurrencyTickers(symbol);
+
+            //  Symbol is upper case, but return object from CoinMarket may contain the ticker with lower case characters.
+            for (const key of Object.keys(coinMarketData.data)) {
+                if (key.toUpperCase() === parts.fromCurrency.toUpperCase()) {
+                    parts.fromCurrency = key;
+                    break;
+                }
+            }
+
+            data.exchangeRate = coinMarketData.data[parts.fromCurrency].quote[parts.toCurrency].price;
+
+            Logger.log(`Price=${data.exchangeRate}`);
+        }
+        catch (ex) {
+            Logger.log(`CoinMarket JSON Parse Error (looking for ${symbol}. err=${ex}).`);
+        }
+
+        return data;
+    }
+
+    /**
+     * getURL() will receive an instance of the throttling object to query if the limit would be exceeded.
+     * @returns {SiteThrottle}
+     */
+    static getThrottleObject() {
+        //  Basic throttle check
+        const limits = [
+            new ThresholdPeriod("MINUTE", 30),
+            new ThresholdPeriod("MONTH", 10000)
+        ];
+
+        return new SiteThrottle("COINMARKET", limits);
+    }
+}
+

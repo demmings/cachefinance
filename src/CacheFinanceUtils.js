@@ -288,7 +288,12 @@ class SiteThrottle {            // skipcq:  JS-0128
                     key = SiteThrottle.createDayKey(siteID);
                     current = SiteThrottle.currentForDay(key);
                     Logger.log(`DAY Check.  key=${key}. Current=${current.toString()}.`);
+                    break;
 
+                case "MONTH":
+                    key = SiteThrottle.createMonthKey(siteID);
+                    current = SiteThrottle.currentForMonth(key);
+                    Logger.log(`MONTH Check.  key=${key}. Current=${current.toString()}.`);
                     break;
 
                 default:
@@ -327,6 +332,10 @@ class SiteThrottle {            // skipcq:  JS-0128
                     SiteThrottle.updateForDay(this.periodKeys[i], this.periodCount[i]);
                     break;
 
+                case "MONTH":
+                    SiteThrottle.updateForMonth(this.periodKeys[i], this.periodCount[i]);
+                    break;
+
                 default:
                     throw new Error(`Invalid threshold period ${period.periodName}`);
             }
@@ -345,7 +354,7 @@ class SiteThrottle {            // skipcq:  JS-0128
         const shortCache = CacheService.getScriptCache();
         const data = shortCache.get(key);
 
-        return data === null ? 0 : JSON.parse(data);            
+        return data === null ? 0 : JSON.parse(data);
     }
 
     /**
@@ -367,7 +376,7 @@ class SiteThrottle {            // skipcq:  JS-0128
      */
     static updateForSecond(key, current) {
         const shortCache = CacheService.getScriptCache();
-        shortCache.put(key, JSON.stringify(current), 10);        
+        shortCache.put(key, JSON.stringify(current), 10);
     }
 
     /**
@@ -390,11 +399,32 @@ class SiteThrottle {            // skipcq:  JS-0128
     }
 
     /**
+     * @param {String} key 
+     * @param {Number} current 
+     */
+    static updateForMonth(key, current) {
+        const longCache = new ScriptSettings();
+        longCache.put(key, current, 30);
+    }
+
+    /**
      * Current requests made for the day.
      * @param {String} key 
      * @returns {Number}
      */
     static currentForDay(key) {
+        const longCache = new ScriptSettings();
+        const data = longCache.get(key);
+
+        return data === null ? 0 : data;
+    }
+
+    /**
+     * Current requests made for the day.
+     * @param {String} key 
+     * @returns {Number}
+     */
+    static currentForMonth(key) {
         const longCache = new ScriptSettings();
         const data = longCache.get(key);
 
@@ -421,7 +451,7 @@ class SiteThrottle {            // skipcq:  JS-0128
         const today = new Date();
         const second = today.getSeconds();
 
-        return SiteThrottle.makeKey(siteID, "SEC", second);        
+        return SiteThrottle.makeKey(siteID, "SEC", second);
     }
 
     /**
@@ -445,6 +475,20 @@ class SiteThrottle {            // skipcq:  JS-0128
         const today = new Date();
         const dayNum = today.getDay();      // Day of the week. 0-6
         return SiteThrottle.makeKey(siteID, "DAY", dayNum);
+    }
+
+    /**
+     * 
+     * @param {String} siteID 
+     * @returns {String}
+     */
+    static createMonthKey(siteID) {
+        //  Month throttle will only really work if around the same number of request happen per day.
+        //  On the first day of a new month, the count will be zero - which does not take into account
+        //  the last 29 days of the previous month.  More work is needed for a rolling throttle....
+        const today = new Date();
+        const dayNum = today.getMonth();      // get month #
+        return SiteThrottle.makeKey(siteID, "MONTH", dayNum);
     }
 }
 
