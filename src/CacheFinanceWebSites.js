@@ -1327,7 +1327,7 @@ class CoinMarket {
             return "";
         }
 
-        if (attribute !== "PRICE" && attribute != "NAME") {
+        if (attribute !== "PRICE" && attribute !== "NAME") {
             return "";
         }
 
