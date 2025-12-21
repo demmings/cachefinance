@@ -425,10 +425,8 @@ class SiteThrottle {            // skipcq:  JS-0128
      * @returns {Number}
      */
     static currentForMonth(key) {
-        const longCache = new ScriptSettings();
-        const data = longCache.get(key);
-
-        return data === null ? 0 : data;
+        //  For now it is the same implentation as the DAY, but I want a separate function in case they differ in future.
+        return SiteThrottle.currentForDay(key);
     }
 
     /**

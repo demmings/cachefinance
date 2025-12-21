@@ -453,7 +453,7 @@ class YahooFinance {
         }
 
         // @ts-ignore
-        const translatedExchangecode = Object.hasOwn(exchageMapping, exchangeCode) ? exchageMapping[exchangeCode] : null; 
+        const translatedExchangecode = Object.hasOwn(exchageMapping, exchangeCode) ? exchageMapping[exchangeCode] : null;
         const ticker = stockTicker.replaceAll(".", "-");
 
         let modifiedSymbol = `${ticker}.${exchangeCode}`;
@@ -1021,7 +1021,7 @@ class GoogleWebSiteFinance {
             return data;
         }
 
-        if (html.indexOf("We couldn't find any match for your search.") !== -1) {
+        if (html.includes("We couldn't find any match for your search.")) {
             Logger.log(`www.google.com/finance:  We couldn't find any match for your search. symbol=${symbol}`);
             return data;
         }
@@ -1239,7 +1239,10 @@ class TwelveData {
         const twelveData = JSON.parse(jsonStr);
 
         try {
-            if (attribute === "NAME") {
+            if (Object.hasOwn(twelveData, "code") && twelveData.code === 404) {
+                Logger.log(twelveData.message);
+            }
+            else if (attribute === "NAME") {
                 data.stockName = twelveData.name;
                 Logger.log(`TwelveData. Name=${data.stockName}`);
             }
@@ -1254,7 +1257,7 @@ class TwelveData {
             }
         }
         catch (ex) {
-            Logger.log(`TwelveData JSON Parse Error (looking for ${countryCode}. err=${ex}).`);
+            Logger.log(`TwelveData JSON Parse Error (looking for ${symbol}. err=${ex}).`);
         }
 
         return data;
@@ -1285,8 +1288,8 @@ class CoinMarket {
     static getInfo(symbol, attribute = "PRICE") {
         let data = new StockAttributes();
 
-        if (attribute !== "PRICE") {
-            Logger.log(`CoinMarket.  Only PRICE is supported: ${symbol}, ${attribute}`);
+        if (attribute !== "PRICE" && attribute !== "NAME") {
+            Logger.log(`CoinMarket.  Only PRICE/NAME is supported: ${symbol}, ${attribute}`);
             return data;
         }
 
@@ -1324,7 +1327,7 @@ class CoinMarket {
             return "";
         }
 
-        if (attribute !== "PRICE") {
+        if (attribute !== "PRICE" && attribute != "NAME") {
             return "";
         }
 
@@ -1332,7 +1335,7 @@ class CoinMarket {
         if (countryCode !== "fx") {
             return "";
         }
-        
+
         const currency = FinanceWebSites.getCurrencyTickers(symbol);
 
         return `https://pro-api.coinmarketcap.com/v1/cryptocurrency/quotes/latest?symbol=${currency.fromCurrency}&convert=${currency.toCurrency}&CMC_PRO_API_KEY=${API_KEY}`;
@@ -1371,6 +1374,7 @@ class CoinMarket {
             }
 
             data.exchangeRate = coinMarketData.data[parts.fromCurrency].quote[parts.toCurrency].price;
+            data.stockName = coinMarketData.data[parts.fromCurrency].name;
 
             Logger.log(`Price=${data.exchangeRate}`);
         }
