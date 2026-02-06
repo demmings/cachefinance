@@ -163,7 +163,10 @@
 *  **LIMITATIONS**
    *  A custom function has an execution time limit of 30 seconds, so trying to do a massive number of web URL data lookups may cause the function to timeout (when Sheets is not behaving properly).  The function itself will exit as it approaches 30 seconds, so any stock not processed yet will return a blank value.  If the function is run again immediately (by changing any value of a parameter - eg. 'yieldpct' to 'YIELDPCT'), it will continue from where it left off.
    *  For any attribute that gets most of the default values from GOOGLEFINANCE, this should not be an issue.  For an attribute like **YIELDPCT**, where all stocks must be looked up at third party websites, it can be more of an issue.
-   *  For my own personal sheets looking up 150 'YIELDPCT' stocks can be processed without issue.
+   *  For my own personal sheets looking up 150 'YIELDPCT' stocks can be processed without issue.  However:
+    * When my daily trigger for recording portfolio values run, there does not appear to be any problems (for the most part) when there are > 150 stocks.  But when the sheet is open it quite often is stuck "Loading...".
+      * When I check the execution logs, the function is finished fairly fast, but the screen is still showing "Loading...".  My guess is that the web interface must miss the API response and sits there forever.
+    * When I broke up CACHEFINANCES() to only process groups of 50 stocks, the interface behaved much better.  So CACHEFINANCES() is still faster to process bulk stock tickers than CACHEFINANCE(), but you still need to limit how many are done at a time. 
 * **EXAMPLES**
 ```
 =CACHEFINANCES(A30:A164, "price", B30:B164, 1200)
