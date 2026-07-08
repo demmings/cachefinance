@@ -2,9 +2,7 @@
 //  Remove comments for testing in NODE
 
 import { SiteThrottle, ThresholdPeriod } from "./CacheFinanceUtils.js";
-export { FinanceWebSites };
-export { StockAttributes };
-export { FinanceWebSite };
+export { FinanceWebSites, FinanceWebSite, StockAttributes };
 export { GlobeAndMail, YahooFinance, YahooApi, FinnHub, AlphaVantage, GoogleWebSiteFinance, TwelveData, CoinMarket };
 
 class Logger {

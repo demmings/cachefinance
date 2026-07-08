@@ -1,8 +1,7 @@
 /*  *** DEBUG START ***
 //  Remove comments for testing in NODE
 export { ScriptSettings, PropertyData };
-import { CacheFinance } from "../CacheFinance.js";
-import { PropertiesService } from "../GasMocks.js";
+import { PropertiesService } from "./GasMocks.js";
 
 class Logger {
     static log(msg) {

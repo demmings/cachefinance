@@ -35,13 +35,12 @@
 
 # Installing
 
-* Googles guide to adding custom functions: [Google Help](https://developers.google.com/apps-script/guides/sheets/functions#creating_a_custom_function)
-* Copy files manually.
-* In the ./dist folder there is one file.  Only one is required.  
+* Google's guide to adding custom functions: [Google Help](https://developers.google.com/apps-script/guides/sheets/functions#creating_a_custom_function)
+* The `./dist` folder contains the single file used by Google Sheets.
     * [CacheFinance.js](https://github.com/demmings/cachefinance/blob/main/dist/CacheFinance.js)
-      * Caches GOOGLEFINANCE results AND does 3'rd party website lookups when all else fails.
-        * This file is an amalgamation of the files in the **/src** folder.
-        * Therefore do NOT use the files in **/src** folder.
+      * Caches GOOGLEFINANCE results AND does 3rd party website lookups when all else fails.
+      * This file is built automatically from the modules in the **`/src`** folder.
+      * Do **not** copy individual files from `/src` into Apps Script.
 * The simple approach is to copy and paste **CacheFinance.js**.
     * From your sheets Select **Extensions** and then **Apps Script**
     * Ensure that Editor is selected.  It is the **< >**
@@ -130,7 +129,7 @@
           * ```=CACHEFINANCE("currency:CADEUR", "Price", "get")```
       * "SET", "SETBLOCKED" - special case.  Sets the preferred site (SET) and blocked site (SETBLOCKED)
         * ```=CACHEFINANCE("TSE:CJP", "PRICE", "SET", "YAHOO")```
-      * "LIST - special case.  Displays the ID for each web site lookup supported.
+      * "LIST" - special case.  Displays the ID for each web site lookup supported.
       * "?" - special case.  Displays all supported special case commands.
       * "REMOVE" - special case.  Takes the preferred site and moves it to the blocked site.
         * ```=CACHEFINANCE("TSE:CJP", "PRICE", "REMOVE")```
@@ -185,6 +184,67 @@
   * cache seconds:  21599  (for data points that don't change often, make this a higher number - max=21600 seconds)
 
 ![Bulk Currency Setup](img/currencyConversions.png)
+
+# Development
+
+This repository includes a Node.js toolchain for building, testing, and validating the Apps Script bundle.
+
+## Project layout
+
+| Path | Purpose |
+| --- | --- |
+| `src/` | Source modules edited during development |
+| `dist/CacheFinance.js` | Single-file Apps Script bundle (generated) |
+| `scripts/` | Build utilities (`gas-source.mjs`, `build-cachefinance.mjs`) |
+| `test/` | Vitest unit tests |
+| `src/GasMocks.js` | Google Apps Script service mocks (tests only) |
+
+Each file in `src/` contains a `DEBUG` block at the top for Node.js imports during testing. That block is stripped automatically when building `dist/CacheFinance.js`.
+
+## Prerequisites
+
+* [Node.js](https://nodejs.org/) 22 or later
+* npm
+
+## Setup
+
+```bash
+npm ci
+```
+
+## Build
+
+Generate or refresh `dist/CacheFinance.js` from `src/`:
+
+```bash
+npm run build
+```
+
+Verify the committed bundle is up to date (used in CI):
+
+```bash
+npm run build:check
+```
+
+The build only rewrites `dist/CacheFinance.js` when the output changes. The bundle header includes a source hash so unchanged sources produce an identical file.
+
+## Test
+
+```bash
+npm test              # run unit tests
+npm run test:watch    # watch mode
+npm run test:coverage # tests with coverage report
+npm run validate      # build:check + coverage (CI command)
+```
+
+Coverage reports are written to `coverage/` (HTML report: `coverage/index.html`).
+
+## Contributing changes
+
+1. Edit files in `src/`.
+2. Run `npm run build` to regenerate `dist/CacheFinance.js`.
+3. Run `npm run validate` before opening a pull request.
+4. Commit both `src/` and `dist/` changes.
 
 # Roll Your Own Web Site Scraper
 

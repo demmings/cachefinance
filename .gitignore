@@ -1,1 +1,3 @@
 *.sh
+node_modules/
+coverage/

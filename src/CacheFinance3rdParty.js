@@ -1,10 +1,10 @@
 /*  *** DEBUG START ***
 //  Remove comments for testing in NODE
 
-import { ScriptSettings } from "./SQL/ScriptSettings.js";
+import { ScriptSettings } from "./ScriptSettings.js";
 import { FinanceWebSites, StockAttributes, FinanceWebSite } from "./CacheFinanceWebSites.js";
 import { CacheFinanceUtils, SiteThrottle } from "./CacheFinanceUtils.js";
-export { ThirdPartyFinance, FinanceWebsiteSearch };
+export { ThirdPartyFinance, FinanceWebsiteSearch, StockWebURL, FinanceSiteLookupAnalyzer, FinanceSiteList, FinanceSiteLookupStats };
 
 class Logger {
     static log(msg) {
