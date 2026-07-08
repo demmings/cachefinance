@@ -2,9 +2,6 @@ name: Test
 
 on:
   push:
-    branches:
-      - master
-      - main
   pull_request:
     types: [opened, synchronize, reopened]
 
@@ -19,7 +16,10 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run validate
+      - name: Verify bundle is up to date
+        run: npm run build:check
+      - name: Run unit tests with coverage
+        run: npm run test:coverage
       - uses: actions/upload-artifact@v4
         if: always()
         with:

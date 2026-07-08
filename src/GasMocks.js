@@ -27,16 +27,29 @@ class ScriptCache {
         this.store.set(key, value);
     }
 
+    /**
+     * Store multiple cache entries at once.
+     * @param {Record<string, string>} obj - Key/value pairs to store.
+     * @param {number} _seconds - Ignored; included for Apps Script API compatibility.
+     */
     putAll(obj, _seconds) {
         for (const [key, value] of Object.entries(obj)) {
             this.store.set(key, value);
         }
     }
 
+    /**
+     * Remove a single cache entry.
+     * @param {string} key - Cache key to remove.
+     */
     remove(key) {
         this.store.delete(key);
     }
 
+    /**
+     * Remove multiple cache entries.
+     * @param {string[]} keys - Cache keys to remove.
+     */
     removeAll(keys) {
         for (const key of keys) {
             this.store.delete(key);
@@ -51,12 +64,20 @@ class ScriptCache {
     }
 }
 
+/**
+ * In-memory mock for Apps Script script properties storage.
+ */
 class ScriptProperties {
     constructor() {
         /** @type {Map<string, string>} */
         this.store = new Map();
     }
 
+    /**
+     * Read a single script property.
+     * @param {string} key - Property key to read.
+     * @returns {string|null} Stored value, or null when missing.
+     */
     getProperty(key) {
         return this.store.has(key) ? this.store.get(key) : null;
     }
@@ -70,16 +91,29 @@ class ScriptProperties {
         return result;
     }
 
+    /**
+     * Store a single script property.
+     * @param {string} key - Property key to set.
+     * @param {string} value - Value to store.
+     */
     setProperty(key, value) {
         this.store.set(key, value);
     }
 
+    /**
+     * Store multiple script properties at once.
+     * @param {Record<string, string>} obj - Key/value pairs to store.
+     */
     setProperties(obj) {
         for (const [key, value] of Object.entries(obj)) {
             this.store.set(key, value);
         }
     }
 
+    /**
+     * Remove a single script property.
+     * @param {string} key - Property key to delete.
+     */
     deleteProperty(key) {
         this.store.delete(key);
     }

@@ -2,6 +2,7 @@
 //  Remove comments for testing in NODE
 export { ScriptSettings, PropertyData };
 import { PropertiesService } from "./GasMocks.js";
+import { CacheFinance } from "./CacheFinance.js";
 
 class Logger {
     static log(msg) {
