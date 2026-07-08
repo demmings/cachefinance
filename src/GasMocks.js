@@ -8,6 +8,11 @@ class ScriptCache {
         this.store = new Map();
     }
 
+    /**
+     * Read a single cache entry.
+     * @param {string} key - Cache key to read.
+     * @returns {string|null} Stored value, or null when missing.
+     */
     get(key) {
         return this.store.has(key) ? this.store.get(key) : null;
     }
@@ -23,6 +28,12 @@ class ScriptCache {
         return result;
     }
 
+    /**
+     * Store a single cache entry.
+     * @param {string} key - Cache key to set.
+     * @param {string} value - Value to store.
+     * @param {number} _seconds - Ignored; included for Apps Script API compatibility.
+     */
     put(key, value, _seconds) {
         this.store.set(key, value);
     }

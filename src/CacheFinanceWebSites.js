@@ -489,7 +489,7 @@ class YahooApi {
         try {
             html = UrlFetchApp.fetch(URL).getContentText();
         }
-        catch (ex) {
+        catch {
             return new StockAttributes();
         }
 
@@ -551,7 +551,7 @@ class YahooApi {
                 stockData.stockName = data.chart.result[0].meta.longName;
             }
         }
-        catch (ex) {
+        catch {
             Logger.log(`Failed to parse JSON: ${symbol}`);
         }
 
@@ -595,7 +595,7 @@ class GlobeAndMail {
         try {
             html = UrlFetchApp.fetch(URL).getContentText();
         }
-        catch (ex) {
+        catch {
             return new StockAttributes();
         }
 
@@ -768,7 +768,7 @@ class FinnHub {
             jsonStr = UrlFetchApp.fetch(URL).getContentText();
             data = FinnHub.parseResponse(jsonStr, symbol, attribute);
         }
-        catch (ex) {
+        catch {
             return data;
         }
 
@@ -869,7 +869,7 @@ class AlphaVantage {
             jsonStr = UrlFetchApp.fetch(URL).getContentText();
             data = AlphaVantage.parseResponse(jsonStr, symbol, attribute);
         }
-        catch (ex) {
+        catch {
             return data;
         }
 
@@ -974,7 +974,7 @@ class GoogleWebSiteFinance {
         try {
             html = UrlFetchApp.fetch(URL).getContentText();
         }
-        catch (ex) {
+        catch {
             return new StockAttributes();
         }
 
@@ -1173,7 +1173,7 @@ class TwelveData {
             jsonStr = UrlFetchApp.fetch(URL).getContentText();
             data = TwelveData.parseResponse(jsonStr, symbol, attribute);
         }
-        catch (ex) {
+        catch {
             return data;
         }
 
@@ -1306,7 +1306,7 @@ class CoinMarket {
             jsonStr = UrlFetchApp.fetch(URL).getContentText();
             data = CoinMarket.parseResponse(jsonStr, symbol, attribute);
         }
-        catch (ex) {
+        catch {
             return data;
         }
 
