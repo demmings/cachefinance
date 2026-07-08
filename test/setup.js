@@ -6,10 +6,14 @@ globalThis.PropertiesService = PropertiesService;
 globalThis.UrlFetchApp = UrlFetchApp;
 globalThis.SpreadsheetApp = SpreadsheetApp;
 globalThis.Logger = {
-    log() {}
+    log(_message) {
+        return;
+    }
 };
 globalThis.CacheFinance = {
-    deleteFromShortCache() {}
+    deleteFromShortCache(_key) {
+        return;
+    }
 };
 
 beforeEach(() => {

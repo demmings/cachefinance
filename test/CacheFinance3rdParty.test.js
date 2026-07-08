@@ -134,7 +134,7 @@ describe("FinanceWebsiteSearch", () => {
         const stock = new StockWebURL("TSE:ZTL");
         const throttle = {
             checkAndIncrement: () => false,
-            update: () => {}
+            update: () => undefined
         };
 
         stock.addSiteURL("YAHOO", "", "", "http://yahoo", buildParseResponse(10), throttle);

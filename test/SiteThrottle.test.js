@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { CacheService } from "../src/GasMocks.js";
 import { SiteThrottle, ThresholdPeriod } from "../src/CacheFinanceUtils.js";
-import { ScriptSettings } from "../src/ScriptSettings.js";
 
 describe("SiteThrottle", () => {
     beforeEach(() => {

@@ -43,6 +43,9 @@ class ScriptCache {
         }
     }
 
+    /**
+     * Remove all entries from the in-memory script cache.
+     */
     clear() {
         this.store.clear();
     }
@@ -81,6 +84,9 @@ class ScriptProperties {
         this.store.delete(key);
     }
 
+    /**
+     * Remove all entries from the in-memory script properties store.
+     */
     clear() {
         this.store.clear();
     }

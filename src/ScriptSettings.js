@@ -60,7 +60,7 @@ class ScriptSettings {      //  skipcq: JS-0128
         try {
             this.scriptProperties.setProperty(propertyKey, jsonData);
         }
-        catch (ex) {
+        catch {
             throw new Error("Cache Limit Exceeded.  Long cache times have limited storage available.  Only cache small tables for long periods.");
         }
     }
@@ -154,7 +154,7 @@ class ScriptSettings {      //  skipcq: JS-0128
             try {
                 propertyValue = JSON.parse(allProperties[key]);
             }
-            catch (e) {
+            catch {
                 //  A property that is NOT cached by CACHEFINANCE
                 continue;
             }

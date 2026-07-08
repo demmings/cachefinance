@@ -30,6 +30,8 @@ export default defineConfig({
                 if (id.includes("/src/") && id.endsWith(".js")) {
                     return enableDebugExports(code);
                 }
+
+                return null;
             }
         }
     ]
