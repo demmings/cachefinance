@@ -13,6 +13,9 @@ function copyEntriesInto(store, entries) {
     }
 }
 
+/**
+ * In-memory mock for Apps Script script cache storage.
+ */
 class ScriptCache {
     constructor() {
         /** @type {Map<string, string>} */
