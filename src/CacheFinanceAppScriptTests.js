@@ -21,7 +21,10 @@ function testCacheFinances() {                                  // skipcq: JS-01
     Logger.log(`BULK CACHE TEST Success${cacheData} . ${singleSymbols}`);
 }
 
-function testUpdateMaster() {
+/**
+ * Manual Apps Script runner for updateMasterWithMissed.
+ */
+function testUpdateMaster() {                                   // skipcq: JS-0128
     const symbols = ["TSE:ZTL", "TSE:FTN-A", "TSE:ZTL"];
     const googleFinanceValues = [null, 10.0, null];
     const symbolsWithNoData = ["TSE:ZTL"];

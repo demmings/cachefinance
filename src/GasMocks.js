@@ -2,6 +2,17 @@
  * In-memory mocks for Google Apps Script services used during Node.js tests.
  */
 
+/**
+ * Copy every own enumerable entry from a plain object into a Map.
+ * @param {Map<string, string>} store - Destination map.
+ * @param {Record<string, string>} entries - Source key/value pairs.
+ */
+function copyEntriesInto(store, entries) {
+    for (const [key, value] of Object.entries(entries)) {
+        store.set(key, value);
+    }
+}
+
 class ScriptCache {
     constructor() {
         /** @type {Map<string, string>} */
@@ -44,9 +55,7 @@ class ScriptCache {
      * @param {number} _seconds - Ignored; included for Apps Script API compatibility.
      */
     putAll(obj, _seconds) {
-        for (const [key, value] of Object.entries(obj)) {
-            this.store.set(key, value);
-        }
+        copyEntriesInto(this.store, obj);
     }
 
     /**
@@ -116,9 +125,7 @@ class ScriptProperties {
      * @param {Record<string, string>} obj - Key/value pairs to store.
      */
     setProperties(obj) {
-        for (const [key, value] of Object.entries(obj)) {
-            this.store.set(key, value);
-        }
+        copyEntriesInto(this.store, obj);
     }
 
     /**

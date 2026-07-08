@@ -11,13 +11,22 @@ import {
 const args = new Set(process.argv.slice(2));
 const checkOnly = args.has("--check");
 
+/**
+ * Format a byte count for CLI output.
+ * @param {number} bytes
+ * @returns {string}
+ */
 function formatBytes(bytes) {
     return `${bytes.toLocaleString()} bytes`;
 }
 
+/**
+ * Build or verify the Apps Script bundle from source modules.
+ */
 function main() {
     if (checkOnly) {
         if (isCacheFinanceBundleCurrent()) {
+            // skipcq: JS-0002
             console.log(`dist/CacheFinance.js is up to date (${SOURCE_FILES.length} source files)`);
             return;
         }
@@ -29,6 +38,7 @@ function main() {
     const result = writeCacheFinanceBundle();
 
     if (result.written) {
+        // skipcq: JS-0002
         console.log(
             `Built ${paths.dist} (${formatBytes(result.bytes)}, ` +
             `${result.sectionCount} files, hash ${result.sourceHash})`
@@ -36,6 +46,7 @@ function main() {
         return;
     }
 
+    // skipcq: JS-0002
     console.log(
         `dist/CacheFinance.js is up to date (${formatBytes(result.bytes)}, hash ${result.sourceHash})`
     );

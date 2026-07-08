@@ -111,7 +111,7 @@ export function validateBundleContent(content) {
     if (content.includes("function testYieldPct")) {
         errors.push("contains optional Apps Script test helpers");
     }
-    if (/^\s*import\s+/m.test(content) || /^\s*export\s+/m.test(content)) {
+    if (/^[ \t]*import\s/m.test(content) || /^[ \t]*export\s/m.test(content)) {
         errors.push("contains ES module import/export statements");
     }
 
