@@ -54,6 +54,14 @@ describe("cachefinance bundle", () => {
         expect(() => validateBundleContent(bundle)).not.toThrow();
     });
 
+    it("excludes optional Apps Script test helpers from the bundle", () => {
+        const { bundle } = buildCacheFinanceBundle();
+
+        expect(bundle).not.toContain("function testYieldPct");
+        expect(bundle).not.toContain("function testCacheFinances");
+        expect(bundle).not.toContain("function testUpdateMaster");
+    });
+
     it("writes dist/CacheFinance.js only when content changes", () => {
         const first = writeCacheFinanceBundle();
         const second = writeCacheFinanceBundle();

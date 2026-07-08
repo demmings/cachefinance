@@ -55,7 +55,7 @@
 
 # Using
 * After adding the script, it will require new permissions.
-* You need to open the script inside the Google Script editor, go to the Run menu and choose 'testYieldPct' from the dropdown. This will prompt you to authorize the script  with the correct permissions.
+* To authorize, run any function from the Apps Script editor **Run** menu that calls `CACHEFINANCE` (for example, paste `src/CacheFinanceAppScriptTests.js` into a second script file and run `testYieldPct`), or trigger the function from a sheet cell.
 * **Fast REST API Websites**
   * For faster stock price lookups when external finance data is used, add the key to **Apps Script** ==> **Project Settings** ==> **Script Properties**
   * The free API will have limitied functionality in all cases.  They are all throttled and may only provide end of day pricing.  You can always get a paid subscription and use that API key if your needs are greater.
@@ -198,6 +198,7 @@ This repository includes a Node.js toolchain for building, testing, and validati
 | `scripts/` | Build utilities (`gas-source.mjs`, `build-cachefinance.mjs`) |
 | `test/` | Vitest unit tests |
 | `src/GasMocks.js` | Google Apps Script service mocks (tests only) |
+| `src/CacheFinanceAppScriptTests.js` | Optional manual GAS test runners (not bundled) |
 
 Each file in `src/` contains a `DEBUG` block at the top for Node.js imports during testing. That block is stripped automatically when building `dist/CacheFinance.js`.
 
