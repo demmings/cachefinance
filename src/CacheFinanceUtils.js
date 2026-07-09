@@ -1,7 +1,7 @@
 /*  *** DEBUG START ***
 //  Remove comments for testing in NODE
 
-import { ScriptSettings } from "./SQL/ScriptSettings.js";
+import { ScriptSettings } from "./ScriptSettings.js";
 export { CacheFinanceUtils, SiteThrottle, ThresholdPeriod };
 
 class Logger {

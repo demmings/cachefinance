@@ -1,8 +1,8 @@
 /*  *** DEBUG START ***
 //  Remove comments for testing in NODE
 export { ScriptSettings, PropertyData };
-import { CacheFinance } from "../CacheFinance.js";
-import { PropertiesService } from "../GasMocks.js";
+import { PropertiesService } from "./GasMocks.js";
+import { CacheFinance } from "./CacheFinance.js";
 
 class Logger {
     static log(msg) {
@@ -61,7 +61,7 @@ class ScriptSettings {      //  skipcq: JS-0128
         try {
             this.scriptProperties.setProperty(propertyKey, jsonData);
         }
-        catch (ex) {
+        catch {
             throw new Error("Cache Limit Exceeded.  Long cache times have limited storage available.  Only cache small tables for long periods.");
         }
     }
@@ -155,7 +155,7 @@ class ScriptSettings {      //  skipcq: JS-0128
             try {
                 propertyValue = JSON.parse(allProperties[key]);
             }
-            catch (e) {
+            catch {
                 //  A property that is NOT cached by CACHEFINANCE
                 continue;
             }
