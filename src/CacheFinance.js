@@ -6,7 +6,7 @@ import { ThirdPartyFinance, FinanceWebsiteSearch } from "./CacheFinance3rdParty.
 import { cacheFinanceTest } from "./CacheFinanceTest.js";
 import { StockAttributes, FinanceWebSites } from "./CacheFinanceWebSites.js";
 import { CacheService, SpreadsheetApp } from "./GasMocks.js";
-import { CacheFinanceUtils } from "./CacheFinanceUtils.js";
+import { CacheFinanceUtils, GoogleHistoryData } from "./CacheFinanceUtils.js";
 export { CACHEFINANCE, CACHEFINANCES, CacheFinance };
 
 class Logger {
@@ -24,11 +24,17 @@ class Logger {
  * BACKDOOR commands are entered using this parameter.
  *  "?" - List all backdoor abilities (SET, GET, SETBLOCKED, GETBLOCKED, LIST, REMOVE, CLEARCACHE, EXPIRECACHE, TEST)
  * e.g. =CACHEFINANCE("", "", "CLEARCACHE") or =CACHEFINANCE("TSE:CJP", "price", "GET")
+ * HISTORICAL DATA:  If googleFinanceValue is a date, it will cache historical data for the given symbol and attribute.  
+ * The cmdOption parameter is the end date, and the interval parameter is the interval for the historical data (e.g. "DAILY", "WEEKLY").  
+ * The googleHistoryValues parameter is the historical data returned by GOOGLEFINANCE().
  * @param {String} cmdOption - Option parameter used only with backdoor commands.
+ * If googleFinanceValue is a date, this parameter is the end date for historical data.
+ * @param {String} interval - Interval for historical data (e.g. "DAILY", "WEEKLY").  Used only if googleFinanceValue is a date.
+ * @param {any[]} googleHistoryValues - Historical data returned by GOOGLEFINANCE().  Used only if googleFinanceValue is a date.    
  * @returns {any}
  * @customfunction
  */
-function CACHEFINANCE(symbol, attribute = "price", googleFinanceValue = "", cmdOption = "") {         // skipcq: JS-0128
+function CACHEFINANCE(symbol, attribute = "price", googleFinanceValue = "", cmdOption = "", interval = "", googleHistoryValues = []) {         // skipcq: JS-0128
     Logger.log(`CACHEFINANCE:${symbol}=${attribute}. Google=${googleFinanceValue}`);
 
     //  Special inputs that perform something other than a finance request.
@@ -39,6 +45,18 @@ function CACHEFINANCE(symbol, attribute = "price", googleFinanceValue = "", cmdO
 
     if (symbol === '' || attribute === '') {
         return '';
+    }
+
+    // @ts-ignore
+    if (googleFinanceValue instanceof Date && !isNaN(googleFinanceValue) && (googleHistoryValues.length > 0 || !CacheFinanceUtils.isValidGoogleValue(googleHistoryValues))) {
+        // When googleFinanceValue is a date, we cache the historical data for the given symbol and attribute.
+        //  googleFinanceValue is the start date.
+        //  cmdOption is the end date.
+        //  interval is the interval for the historical data (e.g. "DAILY", "WEEKLY").
+        //  googleHistoryValues is the historical data returned by GOOGLEFINANCE(). 
+        // @ts-ignore
+        const historicalData = GoogleHistoryData.cacheHistoricalData(symbol, attribute, googleFinanceValue, cmdOption, interval, googleHistoryValues);
+        return historicalData;
     }
 
     const data = CACHEFINANCES([[symbol]], attribute, [[googleFinanceValue]]);

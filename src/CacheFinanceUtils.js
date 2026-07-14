@@ -2,7 +2,7 @@
 //  Remove comments for testing in NODE
 
 import { ScriptSettings } from "./ScriptSettings.js";
-export { CacheFinanceUtils, SiteThrottle, ThresholdPeriod };
+export { CacheFinanceUtils, SiteThrottle, ThresholdPeriod, GoogleHistoryData };
 
 class Logger {
     static log(msg) {
@@ -209,6 +209,38 @@ class CacheFinanceUtils {                       // skipcq: JS-0128
      */
     static convertSingleToDoubleArray(singleArray) {
         return singleArray.map(item => [item]);
+    }
+}
+
+class GoogleHistoryData {
+    /**
+     * @classdesc Caches historical data for a given stock symbol and attribute and interval.
+     * @param {string} symbol 
+     * @param {string} attribute 
+     * @param {Date} startDate 
+     * @param {Date} endDate 
+     * @param {string} interval 
+     * @param {any[][]} googleHistoryValues 
+     * @returns 
+     */
+    static cacheHistoricalData(symbol, attribute, startDate, endDate, interval, googleHistoryValues) {
+        const key = CacheFinanceUtils.makeCacheKey(symbol, attribute + "_HISTORICAL" + "_" + interval);
+        const longCache = new ScriptSettings();
+
+        //  If the googleHistoryValues is not valid, we will try to get the historical data from the long cache.
+        if (!CacheFinanceUtils.isValidGoogleValue(googleHistoryValues)) {
+            const historyData = longCache.get(key);
+            if (historyData === null) {
+                return [];
+            }
+
+            return historyData;
+        }
+
+        const trimmedValues = CacheFinanceUtils.removeEmptyRecordsAtEndOfTable(googleHistoryValues);
+        longCache.put(key, trimmedValues, 30); // Cache for 30 days
+
+        return trimmedValues;
     }
 }
 
