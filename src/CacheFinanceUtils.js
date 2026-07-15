@@ -224,7 +224,7 @@ class GoogleHistoryData {
      * @returns 
      */
     static cacheHistoricalData(symbol, attribute, startDate, endDate, interval, googleHistoryValues) {
-        const key = CacheFinanceUtils.makeCacheKey(symbol, attribute + "_HISTORICAL" + "_" + interval);
+        const key = CacheFinanceUtils.makeCacheKey(symbol, `${attribute}_HISTORICAL_${interval}`);
         const longCache = new ScriptSettings();
 
         //  If the googleHistoryValues is not valid, we will try to get the historical data from the long cache.
