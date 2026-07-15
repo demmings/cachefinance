@@ -48,7 +48,7 @@ function CACHEFINANCE(symbol, attribute = "price", googleFinanceValue = "", cmdO
     }
 
     // @ts-ignore
-    if (googleFinanceValue instanceof Date && !isNaN(googleFinanceValue) && (googleHistoryValues.length > 0 || !CacheFinanceUtils.isValidGoogleValue(googleHistoryValues))) {
+    if (googleFinanceValue instanceof Date && !Number.isNaN(googleFinanceValue) && (googleHistoryValues.length > 0 || !CacheFinanceUtils.isValidGoogleValue(googleHistoryValues))) {
         // When googleFinanceValue is a date, we cache the historical data for the given symbol and attribute.
         //  googleFinanceValue is the start date.
         //  cmdOption is the end date.
