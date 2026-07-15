@@ -212,9 +212,11 @@ class CacheFinanceUtils {                       // skipcq: JS-0128
     }
 }
 
-class GoogleHistoryData {
+/**
+ * @classdesc Caches historical data for a given stock symbol and attribute and interval.
+ */
+class GoogleHistoryData {                                    // skipcq: JS-0128
     /**
-     * @classdesc Caches historical data for a given stock symbol and attribute and interval.
      * @param {string} symbol 
      * @param {string} attribute 
      * @param {Date} startDate 
