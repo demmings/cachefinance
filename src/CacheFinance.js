@@ -56,6 +56,7 @@ function CACHEFINANCE(symbol, attribute = "price", googleFinanceValue = "", cmdO
         //  googleHistoryValues is the historical data returned by GOOGLEFINANCE(). 
         // @ts-ignore
         const historicalData = GoogleHistoryData.cacheHistoricalData(symbol, attribute, googleFinanceValue, cmdOption, interval, googleHistoryValues);
+        
         return historicalData;
     }
 
