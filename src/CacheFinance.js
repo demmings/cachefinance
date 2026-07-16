@@ -47,13 +47,14 @@ function CACHEFINANCE(symbol, attribute = "price", googleFinanceValue = "", cmdO
         return '';
     }
 
+    //  Cache historical data if googleFinanceValue is a date.
     // @ts-ignore
     if (googleFinanceValue instanceof Date && !Number.isNaN(googleFinanceValue) && (googleHistoryValues.length > 0 || !CacheFinanceUtils.isValidGoogleValue(googleHistoryValues))) {
-        // When googleFinanceValue is a date, we cache the historical data for the given symbol and attribute.
-        //  googleFinanceValue is the start date.
-        //  cmdOption is the end date.
-        //  interval is the interval for the historical data (e.g. "DAILY", "WEEKLY").
-        //  googleHistoryValues is the historical data returned by GOOGLEFINANCE(). 
+        //  googleFinanceValue:  is the start date.
+        //  cmdOption:           is the end date.
+        //  interval:            is the interval for the historical data (e.g. "DAILY", "WEEKLY").
+        //  googleHistoryValues: is the historical data returned by GOOGLEFINANCE(). 
+        
         // @ts-ignore
         const historicalData = GoogleHistoryData.cacheHistoricalData(symbol, attribute, googleFinanceValue, cmdOption, interval, googleHistoryValues);
         
