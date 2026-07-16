@@ -19,7 +19,7 @@ jobs:
       - name: build distribution
         run: npm run build  
       - name: Create GitHub Release and Upload Asset
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: "latest"
           files: dist/CacheFinance.js
