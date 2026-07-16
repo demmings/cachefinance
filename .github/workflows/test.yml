@@ -26,7 +26,7 @@ jobs:
           git commit -m "chore: update distribution files [skip ci]"
           git push
       - name: Create GitHub Release and Upload Asset
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@0bd7e8b279c9b5b36661d552472fbbfe671fe26e # v3.0.0
         with:
           tag_name: "latest"
           files: dist/CacheFinance.js
