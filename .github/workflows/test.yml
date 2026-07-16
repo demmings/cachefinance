@@ -16,6 +16,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: build distribution
+        run: npm run build  
       - name: Verify bundle is up to date
         run: npm run build:check
       - name: Run unit tests with coverage
