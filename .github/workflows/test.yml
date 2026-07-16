@@ -18,12 +18,12 @@ jobs:
       - run: npm ci
       - name: build distribution
         run: npm run build  
-      - name: Upload Build Artifact
-        uses: actions/upload-artifact@v4
+      - name: Create GitHub Release and Upload Asset
+        uses: softprops/action-gh-release@v2
         with:
-          node-version: 24
-          name: CacheFinance
-          path: dist/ 
+          files: dist/CacheFinance.js
+          env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Verify bundle is up to date
         run: npm run build:check
       - name: Run unit tests with coverage
