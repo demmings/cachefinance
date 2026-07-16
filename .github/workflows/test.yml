@@ -18,6 +18,13 @@ jobs:
       - run: npm ci
       - name: build distribution
         run: npm run build  
+      - name: Commit and Push Dist File
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add dist/
+          git commit -m "chore: update distribution files [skip ci]"
+          git push
       - name: Create GitHub Release and Upload Asset
         uses: softprops/action-gh-release@v3
         with:
