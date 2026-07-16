@@ -22,8 +22,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: dist/CacheFinance.js
-          env:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Verify bundle is up to date
         run: npm run build:check
       - name: Run unit tests with coverage
