@@ -100,6 +100,13 @@
      * However, in my testing it seems to happen more often when you are doing a large number of finance lookups. 
 * **SYNTAX**.
     *  ```CACHEFINANCE(symbol, attribute, defaultValue)```
+      * Cache a single a single ticker attribute and return the current default value if available OR last cached value when the default value is failing.
+    * ```CACHEFINANCE(symbol, attribute, startDate, endDate, interval, defaultValues)```
+      * Cache a range of historical stock ticker attributes and return the current default values if available or last cahced values when the default values are failing.
+      * Third party websites are never used to retrieve data when no default or cache values are available.
+      * The internal cache is stored for SYMBOL + ATTRIBUTE + INTERVAL.  When the cache values are needed, only the last valid cache update is used amd the date ranges are not considered.
+      * Example:  
+      `=CACHEFINANCE("tse:ry", "price", DATE(2014,1,1), DATE(2014,12,31), "DAILY", GOOGLEFINANCE("tse:ry", "price", DATE(2014,1,1), DATE(2014,12,31), "DAILY"))`
     * **symbol** - stock symbol using regular GOOGLEFINANCE conventions.
     * **attribute** - three supported attributes doing 3'rd party website lookups:  
        * "price" 
