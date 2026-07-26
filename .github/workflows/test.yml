@@ -15,6 +15,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - run: npm ci
       - name: build distribution
         run: npm run build  
       - name: Commit and Push Dist File
